@@ -57,68 +57,27 @@ const PriceChart = ({ priceData, selectedInterval }) => {
     });
   };
 
-  // Generate labels for all dates, regardless of data points
-  const generateDateTimeLabels = () => {
-    // Group data by dates to ensure we have all dates represented
-    const dateMap = new Map();
-    
-    // Create a map of dates to data points
-    priceData.forEach(item => {
-      const date = new Date(item.timestamp);
-      const dateKey = date.toLocaleDateString();
-      
-      if (!dateMap.has(dateKey)) {
-        dateMap.set(dateKey, []);
-      }
-      
-      dateMap.get(dateKey).push(item);
-    });
-    
-    // Now create labels with midnight markers for day changes
-    return priceData.map((item, index) => {
-      const date = new Date(item.timestamp);
-      const dateKey = date.toLocaleDateString();
-      const isMidnight = date.getHours() === 0 && date.getMinutes() === 0;
-      
-      // Mark midnight with "12:00 AM" to indicate new day
-      if (isMidnight || (dateMap.get(dateKey)[0] === item)) {
-        return formatTimeLabel(date);
-      }
-      
-      // For other time labels, use interval-based logic
-      const hour = date.getHours();
-      const minutes = date.getMinutes();
-      
-      // Define key hours for each interval
-      let showTime = false;
-      
-      switch (selectedInterval) {
-        case '5m':
-          // Show every 6 hours
-          showTime = (minutes === 0 && hour % 6 === 0);
-          break;
-        case '15m':
-          // Show every 3 hours
-          showTime = (minutes === 0 && hour % 3 === 0);
-          break;
-        case '30m':
-          // Show every 2 hours
-          showTime = (minutes === 0 && hour % 2 === 0);
-          break;
-        case '1h':
-        case '4h':
-          // Show every hour on the hour
-          showTime = (minutes === 0);
-          break;
-        default:
-          showTime = (minutes === 0 && hour % 3 === 0);
-      }
-      
-      return showTime ? formatTimeLabel(date) : '';
-    });
+  // Calculate skip factor to display approximately 40 labels
+  const calculateSkipFactor = () => {
+    const totalPoints = priceData.length;
+    // Aim for 40 labels, but not more than the number of data points
+    const targetLabels = Math.min(totalPoints, 40);
+    // Calculate how many points to skip to get ~40 labels
+    return Math.max(1, Math.floor(totalPoints / targetLabels));
   };
-  
-  const labels = generateDateTimeLabels();
+
+  const skipFactor = calculateSkipFactor();
+
+  // Generate labels using the skip factor to aim for 40 labels
+  const labels = priceData.map((item, index) => {
+    const date = new Date(item.timestamp);
+    
+    // Show label if this is an index we want to display (based on skip factor)
+    if (index % skipFactor === 0) {
+      return formatTimeLabel(date);
+    }
+    return ''; // Empty string for skipped indices
+  });
   
   const data = {
     labels,
@@ -153,6 +112,11 @@ const PriceChart = ({ priceData, selectedInterval }) => {
           font: {
             family: 'SaintKDG',
             size: 11
+          },
+          autoSkip: false,
+          callback: function(value, index, values) {
+            // Only return the label if it's not an empty string
+            return labels[index] || null;
           }
         },
         grid: {
