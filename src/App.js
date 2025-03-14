@@ -4,7 +4,7 @@ import ItemPriceHistory from './components/ItemPriceHistory';
 import Header from './components/Header';
 import SearchForm from './components/SearchForm';
 import ApiErrorFallback from './components/ApiErrorFallback';
-import './App.css';
+import LiveMarketFeed from './components/LiveMarketFeed';
 
 // Simple Error Boundary component
 class ErrorBoundary extends React.Component {
@@ -55,9 +55,7 @@ function App() {
         <Routes>
           <Route path="/" element={
             <div className="home-container">
-              <h1>SK-Mart</h1>
-              <p>DaD Market Price Charts</p>
-              <SearchForm />
+              <LiveMarketFeed />
             </div>
           } />
           <Route path="/:itemId" element={

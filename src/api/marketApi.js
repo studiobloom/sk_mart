@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// Using a relative URL will route through the proxy in development
-const API_BASE_URL = '/api';
+// Using relative URL with proxy
+const API_BASE_URL = '';
 
 // Create an axios instance with default config
 const apiClient = axios.create({
@@ -195,10 +195,48 @@ export const getItemMarketListings = async (itemName, limit = 10) => {
   }
 };
 
+// Function to get live market data for the feed
+export const getLiveMarketData = async (limit = 50) => {
+  console.log('Fetching live market data...');
+  
+  try {
+    const params = { 
+      limit,
+      order: 'desc' // Most recent first
+    };
+    
+    const response = await retryRequest(() => 
+      apiClient.get('/v1/market', { params })
+    );
+    console.log('Successfully fetched live market data');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching live market data:', error);
+    
+    // Create a more user-friendly error message
+    let errorMessage = 'Failed to fetch live market data.';
+    
+    if (error.response) {
+      if (error.response.status === 429) {
+        errorMessage = 'Too many requests. Please try again later.';
+      } else if (error.response.status >= 500) {
+        errorMessage = 'Server error. The market API may be experiencing issues.';
+      }
+    } else if (error.request) {
+      errorMessage = 'No response from server. The API may be slow or unavailable.';
+    }
+    
+    const enhancedError = new Error(errorMessage);
+    enhancedError.originalError = error;
+    throw enhancedError;
+  }
+};
+
 // Create a named object for default export
 const marketApi = {
   getItemPriceHistory,
-  getItemMarketListings
-}; 
+  getItemMarketListings,
+  getLiveMarketData
+};
 
 export default marketApi; 
