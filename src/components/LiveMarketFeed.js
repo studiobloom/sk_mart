@@ -27,21 +27,95 @@ const LiveMarketFeed = () => {
     return () => clearInterval(interval);
   }, []);
 
+  const renderStats = (priceData, itemName) => {
+    if (!priceData || priceData.length === 0) return null;
+
+    const currentPrice = priceData[priceData.length - 1].avg;
+    
+    // Calculate 24h change
+    const last24hData = priceData.filter(item => {
+      const itemDate = new Date(item.timestamp);
+      const now = new Date(priceData[priceData.length - 1].timestamp);
+      const timeDiff = now - itemDate;
+      const hoursDiff = timeDiff / (1000 * 60 * 60);
+      return hoursDiff <= 24;
+    });
+
+    const oldestIn24h = last24hData[0]?.avg || currentPrice;
+    const priceChange24h = currentPrice - oldestIn24h;
+    const percentChange24h = (priceChange24h / oldestIn24h) * 100;
+
+    // Calculate 7d change
+    const last7dData = priceData.filter(item => {
+      const itemDate = new Date(item.timestamp);
+      const now = new Date(priceData[priceData.length - 1].timestamp);
+      const timeDiff = now - itemDate;
+      const daysDiff = timeDiff / (1000 * 60 * 60 * 24);
+      return daysDiff <= 7;
+    });
+
+    const oldestIn7d = last7dData[0]?.avg || currentPrice;
+    const priceChange7d = currentPrice - oldestIn7d;
+    const percentChange7d = (priceChange7d / oldestIn7d) * 100;
+
+    // Calculate total volume in last 24h
+    const volume24h = last24hData.reduce((sum, item) => sum + item.volume, 0);
+
+    return (
+      <div>
+        {itemName && (
+          <h2 style={{ marginBottom: '1rem' }}>{itemName}</h2>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <div className="stats-container">
+            <div className="stat-card">
+              <div className="stat-label">Current Price</div>
+              <div className="stat-value">
+                {renderPrice(currentPrice, 1)}
+              </div>
+            </div>
+            
+            <div className="stat-card">
+              <div className="stat-label">24h Change</div>
+              <div className="stat-value">
+                {priceChange24h.toFixed(2)} <span className={priceChange24h >= 0 ? 'stat-change-positive' : 'stat-change-negative'}>({percentChange24h.toFixed(2)}%)</span>
+              </div>
+            </div>
+            
+            <div className="stat-card">
+              <div className="stat-label">7d Change</div>
+              <div className="stat-value">
+                {priceChange7d.toFixed(2)} <span className={priceChange7d >= 0 ? 'stat-change-positive' : 'stat-change-negative'}>({percentChange7d.toFixed(2)}%)</span>
+              </div>
+            </div>
+            
+            <div className="stat-card">
+              <div className="stat-label">24h Volume</div>
+              <div className="stat-value">{volume24h}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Helper function to get background color based on rarity
   const getRarityColor = (rarity) => {
     switch (rarity?.toLowerCase()) {
       case 'legendary':
-        return [158, 126, 45]; // gold gradient
+        return [255, 154, 0];
       case 'epic':
-        return [138, 43, 226]; // purple gradient
+        return [208, 103, 255];
       case 'rare':
-        return [0, 119, 190]; // blue gradient
+        return [0, 170, 238];
       case 'uncommon':
-        return [46, 139, 87]; // green gradient
+        return [124, 214, 0];
       case 'unique':
-        return [92, 92, 66]; // olive gradient
-      default:
-        return [128, 128, 128]; // gray gradient
+        return [255, 232, 129];
+      case 'common':
+        return [255, 255, 255];
+      case 'poor':
+        return [120, 120, 120];
     }
   };
 
@@ -63,6 +137,27 @@ const LiveMarketFeed = () => {
     }
   };
 
+  const renderPrice = (totalPrice, quantity = 1) => {
+    if (!totalPrice || totalPrice <= 0) return null;
+    const perPiecePrice = quantity > 0 ? Math.floor(totalPrice / quantity) : totalPrice;
+
+    return (
+      <div className="item-price">
+        <img src="/images/divider.png" alt="" className="price-divider" />
+        <div className="price-section">
+          <span className="price-value">{totalPrice}</span>
+          <i className="coin-icon fas fa-coins" />
+        </div>
+        <img src="/images/divider.png" alt="" className="price-divider" />
+        <div className="price-section">
+          <span className="price-value">{perPiecePrice}</span>
+          <i className="coin-icon fas fa-coins" />
+          <span className="quantity">x{quantity}</span>
+        </div>
+      </div>
+    );
+  };
+
   if (loading) return <div className="loading">Loading market data...</div>;
   if (error) return <div className="error">{error}</div>;
 
@@ -76,6 +171,10 @@ const LiveMarketFeed = () => {
             className="market-item"
             style={{ 
               position: 'relative',
+              display: 'grid',
+              gridTemplateColumns: '50px minmax(0, 1fr) 120px auto',
+              gap: '15px',
+              alignItems: 'center'
             }}
           >
             <div 
@@ -91,24 +190,28 @@ const LiveMarketFeed = () => {
               }}
             />
             <div className="item-image">
-              {/* Placeholder for item image */}
               <div className="item-icon" style={{ backgroundColor: '#333' }}>
                 {item.item_id?.charAt(0) || '?'}
               </div>
             </div>
-            <div className="item-info">
-              <div className="item-name" style={{ color: getTextColor(item.rarity) }}>
-                {item.item}
-              </div>
-              <div className="item-rarity" style={{ color: getTextColor(item.rarity) }}>
+            <div className="item-name" style={{ color: getTextColor(item.rarity) }}>
+              {item.item}
+            </div>
+            <div style={{ 
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <img src="/images/divider.png" alt="" className="price-divider" />
+              <div className="item-rarity" style={{ 
+                color: getTextColor(item.rarity),
+                textAlign: 'right',
+                flex: 1
+              }}>
                 {item.rarity}
               </div>
             </div>
-            <div className="item-price">
-              <span className="coin-icon">💰</span>
-              <span className="price-value" style={{ color: 'var(--gold)' }}>{item.price}</span>
-              {item.quantity > 1 && <span className="quantity" style={{ color: 'var(--gold)' }}>x{item.quantity}</span>}
-            </div>
+            {renderPrice(item.price, item.quantity)}
           </div>
         ))}
       </div>

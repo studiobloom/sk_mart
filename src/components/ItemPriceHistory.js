@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { getItemPriceHistory } from '../api/marketApi';
 import PriceChart from './PriceChart';
-import ItemStats from './ItemStats';
+import LiveMarketFeed from './LiveMarketFeed';
 
 const ItemPriceHistory = () => {
   const { itemId } = useParams();
@@ -169,7 +169,7 @@ const ItemPriceHistory = () => {
         <>
           {/* Always use statsData for consistent stats display */}
           {hasStatsData ? (
-            <ItemStats priceData={statsData} itemName={formatItemName(itemId)} />
+            <LiveMarketFeed.renderStats priceData={statsData} itemName={formatItemName(itemId)} />
           ) : (
             <div className="loading">
               <p>Loading statistics...</p>

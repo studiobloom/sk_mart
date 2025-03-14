@@ -93,6 +93,7 @@ code {
 
 h1 {
   font-size: 2rem;
+  color: var(--gold);
 }
 
 a {
@@ -101,6 +102,7 @@ a {
 
 h2 {
   font-size: 1.5rem;
+  color: var(--gold);
 }
 
 .header {
@@ -311,19 +313,14 @@ h2 {
 }
 
 .item-rarity {
-  margin-left: 10px;
-  padding: 4px 8px;
-  border-radius: 4px;
+  display: flex;
+  justify-content: space-around;
+  width: 200px;
+  max-width: 200px;
   font-size: 14px;
+  text-align: center;
   text-transform: uppercase;
 }
-
-.Poor { background-color: #666666; color: #ffffff; }
-.Uncommon { background-color: #3a962e; color: #000000; }
-.Rare { background-color: #3895c0; color: #ffffff; }
-.Epic { background-color: #9146d8; color: #ffffff; }
-.Legendary { background-color: #ff8000; color: #ffffff; }
-.Unique { background-color: #e4cc80; color: #000000; }
 
 /* Error Fallback */
 .error-fallback {
@@ -374,12 +371,7 @@ h2 {
     flex-direction: column;
     align-items: flex-start;
   }
-  
-  .item-rarity {
-    margin-left: 0;
-    margin-top: 10px;
   }
-}
 
 .chart-header {
   display: flex;
@@ -480,8 +472,8 @@ h2 {
 
 .market-item {
   display: grid;
-  grid-template-columns: 50px 1fr auto;
-  grid-template-areas: "image info price";
+  grid-template-columns: 50px minmax(0, 1fr) auto auto;
+  grid-template-areas: "image name rarity price";
   padding: 10px;
   height: 60px;
   background: var(--border-frame);
@@ -489,6 +481,7 @@ h2 {
   border-radius: 0;
   transition: transform 0.2s;
   align-items: center;
+  gap: 15px;
 }
 
 .item-image {
@@ -519,38 +512,57 @@ h2 {
 }
 
 .item-name {
+  grid-area: name;
   font-size: 1.1rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.item-rarity {
-  font-size: 0.9rem;
-  text-transform: uppercase;
-  padding: 3px 8px;
-  border-radius: 0;
-}
 
 .item-price {
   grid-area: price;
   display: flex;
   align-items: center;
-  justify-self: end;
-  color: var(--gold) !important;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 200px;
+  padding-right: 10px;
+}
+
+.price-section {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 80px;
+  justify-content: flex-end;
 }
 
 .coin-icon {
-  margin-right: 5px;
-  font-size: 1.1rem;
+  color: var(--gold);
+  font-size: 0.9rem;
+  margin-left: 2px;
 }
 
 .price-value {
-  margin-right: 4px;
+  color: var(--gold);
+  font-weight: 500;
+  min-width: 40px;
+  text-align: right;
 }
 
 .quantity {
+  color: var(--gold);
   font-size: 0.9rem;
   opacity: 0.9;
-  margin-left: 4px;
+  margin-left: 2px;
+}
+
+.item-divider,
+.price-divider {
+  height: 30px;
+  width: auto;
+  margin: 0 4px;
+  opacity: 0.6;
+  vertical-align: middle;
 } 
