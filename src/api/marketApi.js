@@ -194,7 +194,10 @@ export const getItemMarketListings = async (itemName, limit = 10) => {
   }
 };
 
-export default {
+// Create a named object for default export
+const marketApi = {
   getItemPriceHistory,
   getItemMarketListings
 }; 
+
+export default marketApi; 

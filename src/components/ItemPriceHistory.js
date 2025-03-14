@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { getItemPriceHistory } from '../api/marketApi';
 import PriceChart from './PriceChart';
 import ItemStats from './ItemStats';
 
 const ItemPriceHistory = () => {
   const { itemId } = useParams();
-  const navigate = useNavigate();
   
   const [aggregatedData, setAggregatedData] = useState([]);
   const [loading, setLoading] = useState(true);

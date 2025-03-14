@@ -44,14 +44,15 @@ const PriceChart = ({ priceData }) => {
   });
 
   const avgPrices = priceData.map(item => item.avg);
-  const minPrices = priceData.map(item => item.min);
-  const maxPrices = priceData.map(item => item.max);
+  // These values are not currently used in chart but may be useful for future enhancements
+  // const minPrices = priceData.map(item => item.min);
+  // const maxPrices = priceData.map(item => item.max);
   const volumes = priceData.map(item => item.volume);
 
   // Calculate the max volume for scaling
   const maxVolume = Math.max(...volumes);
-  // Scale volumes to fit in the chart (25% of chart height)
-  const scaledVolumes = volumes.map(vol => (vol / maxVolume) * (Math.max(...avgPrices) * 0.25));
+  // Scale volumes to fit in the chart (25% of chart height) - not currently used
+  // const scaledVolumes = volumes.map(vol => (vol / maxVolume) * (Math.max(...avgPrices) * 0.25));
 
   const data = {
     labels,

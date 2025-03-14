@@ -37,9 +37,9 @@ const ItemStats = ({ priceData, itemName }) => {
   // Calculate total volume in last 24h
   const volume24h = last24hData.reduce((sum, item) => sum + item.volume, 0);
 
-  // Find all-time high and low
-  const allTimeHigh = Math.max(...priceData.map(item => item.max));
-  const allTimeLow = Math.min(...priceData.map(item => item.min));
+  // Comment out the unused variables for now - can be used in future enhancements
+  // const allTimeHigh = Math.max(...priceData.map(item => item.max));
+  // const allTimeLow = Math.min(...priceData.map(item => item.min));
 
   return (
     <div>
