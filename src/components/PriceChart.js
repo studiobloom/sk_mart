@@ -47,7 +47,7 @@ const PriceChart = ({ priceData }) => {
   // const avgPrices = priceData.map(item => item.avg);
   // const minPrices = priceData.map(item => item.min);
   // const maxPrices = priceData.map(item => item.max);
-  const volumes = priceData.map(item => item.volume);
+  // const volumes = priceData.map(item => item.volume);
 
   // This is not currently used but may be needed for future volume display features
   // const maxVolume = Math.max(...volumes);
