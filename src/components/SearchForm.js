@@ -17,7 +17,7 @@ const SearchForm = () => {
       <input
         type="text"
         className="search-input"
-        placeholder="Enter item name (e.g., WolfPelt, Lightfoot Boots)"
+        placeholder="Enter item name (e.g., SkullKey)"
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.target.value)}
       />

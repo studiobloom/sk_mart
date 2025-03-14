@@ -7,13 +7,23 @@ import ItemStats from './ItemStats';
 const ItemPriceHistory = () => {
   const { itemId } = useParams();
   
-  const [aggregatedData, setAggregatedData] = useState([]);
+  const [chartData, setChartData] = useState([]);
+  const [statsData, setStatsData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingTime, setLoadingTime] = useState(0);
   const [priceError, setPriceError] = useState(null);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [selectedInterval, setSelectedInterval] = useState('1h');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Timer for loading state
+  const availableIntervals = [
+    { value: '5m', label: '5 Min' },
+    { value: '15m', label: '15 Min' },
+    { value: '30m', label: '30 Min' },
+    { value: '1h', label: '1 Hour' },
+    { value: '4h', label: '4 Hours' }
+  ];
+
   useEffect(() => {
     let timer;
     if (loading) {
@@ -29,57 +39,86 @@ const ItemPriceHistory = () => {
     };
   }, [loading]);
 
-  useEffect(() => {
-    const fetchAndAggregateData = async () => {
-      setLoading(true);
-      setPriceError(null);
-      setLoadingTime(0);
+  // Fetch stats data (always using 1h interval for consistency)
+  const fetchStatsData = async () => {
+    try {
+      // Always use 1h interval for stats to ensure consistency
+      const response = await getItemPriceHistory(itemId, '1h');
+      const data = response.body || [];
       
-      const intervals = ['15m', '1h', '4h', '1d'];
-      let allData = [];
-      let hasError = false;
-      
-      const results = await Promise.all(intervals.map(async (int) => {
-        try {
-          const response = await getItemPriceHistory(itemId, int);
-          return { interval: int, data: response.body || [] };
-        } catch (err) {
-          console.error(`Error fetching ${int} interval data:`, err);
-          hasError = true;
-          return { interval: int, data: [] };
-        }
-      }));
-      
-      const timestampMap = new Map();
-      
-      for (const { data } of results.sort((a, b) => {
-        const order = { '15m': 0, '1h': 1, '4h': 2, '1d': 3 };
-        return order[a.interval] - order[b.interval];
-      })) {
-        for (const point of data) {
-          if (!timestampMap.has(point.timestamp)) {
-            timestampMap.set(point.timestamp, point);
-          }
-        }
-      }
-      
-      allData = Array.from(timestampMap.values()).sort((a, b) => 
+      const sortedData = [...data].sort((a, b) => 
         new Date(a.timestamp) - new Date(b.timestamp)
       );
       
-      if (hasError && allData.length === 0) {
-        setPriceError('Failed to fetch price history. Please check if the item name is correct.');
-      }
-      
-      setAggregatedData(allData);
-      setLoading(false);
-      setDataLoaded(true);
-    };
-    
-    if (itemId) {
-      fetchAndAggregateData();
+      setStatsData(sortedData);
+      return true;
+    } catch (err) {
+      console.error(`Error fetching stats data:`, err);
+      return false;
     }
-  }, [itemId]);
+  };
+
+  // Fetch chart data with the selected interval
+  const fetchChartData = async () => {
+    setIsRefreshing(true);
+    
+    try {
+      const response = await getItemPriceHistory(itemId, selectedInterval);
+      const data = response.body || [];
+      
+      const sortedData = [...data].sort((a, b) => 
+        new Date(a.timestamp) - new Date(b.timestamp)
+      );
+      
+      setChartData(sortedData);
+      setIsRefreshing(false);
+      return true;
+    } catch (err) {
+      console.error(`Error fetching ${selectedInterval} interval data:`, err);
+      setPriceError(`Failed to fetch price history for interval ${selectedInterval}. Please try another interval.`);
+      setIsRefreshing(false);
+      return false;
+    }
+  };
+
+  // Initial data load
+  useEffect(() => {
+    if (itemId) {
+      setLoading(true);
+      setPriceError(null);
+      
+      const loadData = async () => {
+        // First load stats data (1h interval)
+        const statsSuccess = await fetchStatsData();
+        
+        // Then load chart data with selected interval
+        const chartSuccess = await fetchChartData();
+        
+        if (statsSuccess && chartSuccess) {
+          setDataLoaded(true);
+        } else if (!statsSuccess && !chartSuccess) {
+          setPriceError('Failed to fetch any data. Please check if the item name is correct.');
+        }
+        
+        setLoading(false);
+      };
+      
+      loadData();
+    }
+  }, [itemId]); // Only re-run when itemId changes
+
+  // When interval changes, only update chart data
+  useEffect(() => {
+    if (itemId && dataLoaded) {
+      fetchChartData();
+    }
+  }, [selectedInterval]);
+
+  const handleIntervalChange = (interval) => {
+    if (interval !== selectedInterval) {
+      setSelectedInterval(interval);
+    }
+  };
 
   const formatItemName = (name) => {
     return name
@@ -95,7 +134,7 @@ const ItemPriceHistory = () => {
           <div>Loading price history for {formatItemName(itemId)}...</div>
           {loadingTime > 3 && (
             <div style={{ marginTop: '10px', fontSize: '14px', color: '#8a8a8a' }}>
-              Aggregating data from all time intervals...
+              Loading data...
               {loadingTime > 10 && (
                 <div style={{ marginTop: '5px' }}>
                   Still loading... ({loadingTime}s)
@@ -108,9 +147,10 @@ const ItemPriceHistory = () => {
     );
   }
 
-  const shouldShowChart = aggregatedData.length > 0;
+  const shouldShowChart = chartData.length > 0;
+  const hasStatsData = statsData.length > 0;
 
-  if (priceError && !shouldShowChart) {
+  if (priceError && !shouldShowChart && !hasStatsData) {
     return (
       <div>
         <div className="error">{priceError}</div>
@@ -127,21 +167,41 @@ const ItemPriceHistory = () => {
         <div className="error">{priceError}</div>
       ) : (
         <>
-          <ItemStats priceData={aggregatedData} itemName={formatItemName(itemId)} />
+          {/* Always use statsData for consistent stats display */}
+          {hasStatsData ? (
+            <ItemStats priceData={statsData} itemName={formatItemName(itemId)} />
+          ) : (
+            <div className="loading">
+              <p>Loading statistics...</p>
+            </div>
+          )}
           
           <div className="card">
             <div className="chart-header">
               <h2>Market History</h2>
-              <div className="chart-info">
-                <span>Historical price data</span>
+              <div className="interval-selector">
+                {availableIntervals.map(interval => (
+                  <button
+                    key={interval.value}
+                    className={`interval-button ${selectedInterval === interval.value ? 'active' : ''}`}
+                    onClick={() => handleIntervalChange(interval.value)}
+                    disabled={isRefreshing}
+                  >
+                    {interval.label}
+                  </button>
+                ))}
               </div>
             </div>
             
-            {aggregatedData.length > 0 ? (
-              <PriceChart priceData={aggregatedData} />
+            {isRefreshing ? (
+              <div className="loading">
+                <p>Updating chart data...</p>
+              </div>
+            ) : shouldShowChart ? (
+              <PriceChart priceData={chartData} selectedInterval={selectedInterval} />
             ) : (
               <div className="loading">
-                <p>No price data available.</p>
+                <p>No price data available for the selected interval.</p>
               </div>
             )}
           </div>

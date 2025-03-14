@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -24,36 +24,95 @@ ChartJS.register(
   Filler
 );
 
-const PriceChart = ({ priceData }) => {
+const PriceChart = ({ priceData, selectedInterval }) => {
+  // Reference to the chart instance for cleanup
+  const chartRef = useRef(null);
+
+  // Clean up chart on unmount or re-render
+  useEffect(() => {
+    return () => {
+      if (chartRef.current) {
+        chartRef.current.destroy();
+      }
+    };
+  }, []);
+
   if (!priceData || priceData.length === 0) {
     return <div className="loading">No price data available</div>;
   }
 
-  // Format the data for the chart
-  const labels = priceData.map((item, index) => {
-    const date = new Date(item.timestamp);
-    const prevDate = index > 0 ? new Date(priceData[index - 1].timestamp) : null;
+  // Function to format a time as "12:00 AM" or "12:00 PM"
+  const formatTimeLabel = (date) => {
+    return date.toLocaleTimeString(undefined, { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: true 
+    });
+  };
+
+  // Generate labels for all dates, regardless of data points
+  const generateDateTimeLabels = () => {
+    // Group data by dates to ensure we have all dates represented
+    const dateMap = new Map();
     
-    // If it's the first item or the date has changed from the previous item
-    if (!prevDate || date.toLocaleDateString() !== prevDate.toLocaleDateString()) {
-      return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
+    // Create a map of dates to data points
+    priceData.forEach(item => {
+      const date = new Date(item.timestamp);
+      const dateKey = date.toLocaleDateString();
+      
+      if (!dateMap.has(dateKey)) {
+        dateMap.set(dateKey, []);
+      }
+      
+      dateMap.get(dateKey).push(item);
+    });
     
-    // If it's the same day, only show time
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  });
-
-  // These values are not currently used in chart but may be useful for future enhancements
-  // const avgPrices = priceData.map(item => item.avg);
-  // const minPrices = priceData.map(item => item.min);
-  // const maxPrices = priceData.map(item => item.max);
-  // const volumes = priceData.map(item => item.volume);
-
-  // This is not currently used but may be needed for future volume display features
-  // const maxVolume = Math.max(...volumes);
-  // Scale volumes to fit in the chart (25% of chart height) - not currently used
-  // const scaledVolumes = volumes.map(vol => (vol / maxVolume) * (Math.max(...avgPrices) * 0.25));
-
+    // Now create labels with midnight markers for day changes
+    return priceData.map((item, index) => {
+      const date = new Date(item.timestamp);
+      const dateKey = date.toLocaleDateString();
+      const isMidnight = date.getHours() === 0 && date.getMinutes() === 0;
+      
+      // Mark midnight with "12:00 AM" to indicate new day
+      if (isMidnight || (dateMap.get(dateKey)[0] === item)) {
+        return formatTimeLabel(date);
+      }
+      
+      // For other time labels, use interval-based logic
+      const hour = date.getHours();
+      const minutes = date.getMinutes();
+      
+      // Define key hours for each interval
+      let showTime = false;
+      
+      switch (selectedInterval) {
+        case '5m':
+          // Show every 6 hours
+          showTime = (minutes === 0 && hour % 6 === 0);
+          break;
+        case '15m':
+          // Show every 3 hours
+          showTime = (minutes === 0 && hour % 3 === 0);
+          break;
+        case '30m':
+          // Show every 2 hours
+          showTime = (minutes === 0 && hour % 2 === 0);
+          break;
+        case '1h':
+        case '4h':
+          // Show every hour on the hour
+          showTime = (minutes === 0);
+          break;
+        default:
+          showTime = (minutes === 0 && hour % 3 === 0);
+      }
+      
+      return showTime ? formatTimeLabel(date) : '';
+    });
+  };
+  
+  const labels = generateDateTimeLabels();
+  
   const data = {
     labels,
     datasets: [
@@ -92,7 +151,7 @@ const PriceChart = ({ priceData }) => {
         grid: {
           color: 'rgba(42, 42, 42, 0.5)',
           drawBorder: false,
-        },
+        }
       },
       y: {
         title: {
@@ -136,6 +195,11 @@ const PriceChart = ({ priceData }) => {
         },
         bodyColor: '#c7c7c7',
         callbacks: {
+          title: function(tooltipItems) {
+            const item = priceData[tooltipItems[0].dataIndex];
+            const date = new Date(item.timestamp);
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          },
           label: function(context) {
             const data = priceData[context.dataIndex];
             return [
@@ -152,7 +216,7 @@ const PriceChart = ({ priceData }) => {
 
   return (
     <div className="chart-container">
-      <Line data={data} options={options} />
+      <Line ref={chartRef} data={data} options={options} />
     </div>
   );
 };

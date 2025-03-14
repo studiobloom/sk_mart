@@ -56,7 +56,7 @@ function App() {
           <Route path="/" element={
             <div className="home-container">
               <h1>SK-Mart</h1>
-              <p>Welcome to SK-Mart - Your One-Stop Shopping Destination</p>
+              <p>DaD Market Price Charts</p>
               <SearchForm />
             </div>
           } />
