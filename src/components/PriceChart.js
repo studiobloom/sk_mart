@@ -43,14 +43,14 @@ const PriceChart = ({ priceData }) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   });
 
-  const avgPrices = priceData.map(item => item.avg);
   // These values are not currently used in chart but may be useful for future enhancements
+  // const avgPrices = priceData.map(item => item.avg);
   // const minPrices = priceData.map(item => item.min);
   // const maxPrices = priceData.map(item => item.max);
   const volumes = priceData.map(item => item.volume);
 
-  // Calculate the max volume for scaling
-  const maxVolume = Math.max(...volumes);
+  // This is not currently used but may be needed for future volume display features
+  // const maxVolume = Math.max(...volumes);
   // Scale volumes to fit in the chart (25% of chart height) - not currently used
   // const scaledVolumes = volumes.map(vol => (vol / maxVolume) * (Math.max(...avgPrices) * 0.25));
 

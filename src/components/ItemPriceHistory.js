@@ -52,7 +52,7 @@ const ItemPriceHistory = () => {
       
       const timestampMap = new Map();
       
-      for (const { interval, data } of results.sort((a, b) => {
+      for (const { data } of results.sort((a, b) => {
         const order = { '15m': 0, '1h': 1, '4h': 2, '1d': 3 };
         return order[a.interval] - order[b.interval];
       })) {
