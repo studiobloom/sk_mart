@@ -30,7 +30,7 @@ const PriceChart = ({ priceData, selectedInterval }) => {
 
   // Clean up chart on unmount or re-render
   useEffect(() => {
-    // No setup needed - we just need cleanup
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     return () => {
       const chart = chartRef.current;
       if (chart && chart.destroy) {
