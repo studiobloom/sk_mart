@@ -1,0 +1,22 @@
+.App {
+  text-align: center;
+}
+
+.home-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.home-container h1 {
+  margin-bottom: 20px;
+  color: #e94560;
+}
+
+.home-container p {
+  margin-bottom: 30px;
+  font-size: 18px;
+  color: #ccc;
+} 
