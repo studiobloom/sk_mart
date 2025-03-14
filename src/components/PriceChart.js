@@ -30,11 +30,16 @@ const PriceChart = ({ priceData, selectedInterval }) => {
 
   // Clean up chart on unmount or re-render
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Nothing to do on mount, but we need to keep track of the ref's current value
+    // for our cleanup function
+    let chartInstance = null;
+
+    // Return cleanup function that uses the saved reference
     return () => {
-      const chart = chartRef.current;
-      if (chart && chart.destroy) {
-        chart.destroy();
+      // Get the current chart instance from the stored variable or from current ref
+      chartInstance = chartInstance || chartRef.current;
+      if (chartInstance && chartInstance.destroy) {
+        chartInstance.destroy();
       }
     };
   }, []);
@@ -216,9 +221,20 @@ const PriceChart = ({ priceData, selectedInterval }) => {
     },
   };
 
+  // Set up a callback reference to store the chart instance
+  const setChartRef = (chart) => {
+    if (chart) {
+      chartRef.current = chart;
+    }
+  };
+
   return (
     <div className="chart-container">
-      <Line ref={chartRef} data={data} options={options} />
+      <Line 
+        ref={setChartRef} 
+        data={data} 
+        options={options} 
+      />
     </div>
   );
 };
