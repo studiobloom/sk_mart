@@ -1,0 +1,17 @@
+[build]
+  command = "npm run build"
+  publish = "build"
+  functions = "netlify/functions"
+
+# This redirect sends API requests to our serverless function
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+  force = true
+
+# This handles client-side routing in SPA
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200 

@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'https://api.darkerdb.com';
+// Using a relative URL will route through the proxy in development
+const API_BASE_URL = '/api';
 
 // Create an axios instance with default config
 const apiClient = axios.create({
