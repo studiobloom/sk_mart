@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { getItemPriceHistory } from '../api/marketApi';
 import PriceChart from './PriceChart';
@@ -40,7 +40,7 @@ const ItemPriceHistory = () => {
   }, [loading]);
 
   // Fetch stats data (always using 1h interval for consistency)
-  const fetchStatsData = async () => {
+  const fetchStatsData = useCallback(async () => {
     try {
       // Always use 1h interval for stats to ensure consistency
       const response = await getItemPriceHistory(itemId, '1h');
@@ -56,10 +56,10 @@ const ItemPriceHistory = () => {
       console.error(`Error fetching stats data:`, err);
       return false;
     }
-  };
+  }, [itemId]);
 
   // Fetch chart data with the selected interval
-  const fetchChartData = async () => {
+  const fetchChartData = useCallback(async () => {
     setIsRefreshing(true);
     
     try {
@@ -79,7 +79,7 @@ const ItemPriceHistory = () => {
       setIsRefreshing(false);
       return false;
     }
-  };
+  }, [itemId, selectedInterval]);
 
   // Initial data load
   useEffect(() => {
@@ -105,14 +105,14 @@ const ItemPriceHistory = () => {
       
       loadData();
     }
-  }, [itemId]); // Only re-run when itemId changes
+  }, [itemId, fetchStatsData, fetchChartData]); // Include the callback functions as dependencies
 
   // When interval changes, only update chart data
   useEffect(() => {
     if (itemId && dataLoaded) {
       fetchChartData();
     }
-  }, [selectedInterval]);
+  }, [selectedInterval, itemId, dataLoaded, fetchChartData]);
 
   const handleIntervalChange = (interval) => {
     if (interval !== selectedInterval) {

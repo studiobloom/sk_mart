@@ -30,9 +30,11 @@ const PriceChart = ({ priceData, selectedInterval }) => {
 
   // Clean up chart on unmount or re-render
   useEffect(() => {
+    // No setup needed - we just need cleanup
     return () => {
-      if (chartRef.current) {
-        chartRef.current.destroy();
+      const chart = chartRef.current;
+      if (chart && chart.destroy) {
+        chart.destroy();
       }
     };
   }, []);
