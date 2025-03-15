@@ -103,11 +103,10 @@ const LiveMarketFeed = () => {
   const [displayedData, setDisplayedData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [imagesLoaded, setImagesLoaded] = useState(false);
-  const [imagesLoadingCount, setImagesLoadingCount] = useState(0);
   const [visibleCount] = useState(10);
-  const [forceShowContent, setForceShowContent] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [simulatingLiveFeed, setSimulatingLiveFeed] = useState(false);
+  const [pendingItems, setPendingItems] = useState([]);
 
   useEffect(() => {
     const fetchMarketData = async () => {
@@ -115,29 +114,29 @@ const LiveMarketFeed = () => {
         setIsRefreshing(true);
         const response = await marketApi.getLiveMarketData();
         
-        // Store the new data but don't display it yet
+        // Store the new data
         setMarketData(response.body);
         
         if (loading) {
-          // First load - nothing to display yet
+          // First load - show initial 10 items immediately
+          setDisplayedData(response.body.slice(0, visibleCount));
           setLoading(false);
+          setIsRefreshing(false);
+        } else {
+          // Find new items that aren't currently displayed
+          const currentIds = new Set(displayedData.map(item => item.id));
+          const newItems = response.body.filter(item => !currentIds.has(item.id));
+          
+          if (newItems.length > 0) {
+            // Queue up new items for the simulated live feed
+            setPendingItems(newItems);
+            setSimulatingLiveFeed(true);
+          } else {
+            // No new items, just update existing ones
+            setDisplayedData(response.body.slice(0, visibleCount));
+            setIsRefreshing(false);
+          }
         }
-        
-        // Reset image loading state for new data
-        setImagesLoaded(false);
-        setForceShowContent(false);
-        
-        // Calculate total number of images to load for the visible items only
-        // Each item has: 1 ItemIcon + 1 divider in the rarity section + 4 images in renderPrice (2 dividers + 2 gold coins)
-        const itemsToShow = response.body.slice(0, visibleCount);
-        setImagesLoadingCount(itemsToShow.length * 6);
-        
-        // Set a timeout to force show content after 3 seconds even if images haven't loaded
-        const timeoutId = setTimeout(() => {
-          setForceShowContent(true);
-        }, 3000);
-        
-        return () => clearTimeout(timeoutId);
       } catch (err) {
         setError(err.message);
         setLoading(false);
@@ -152,34 +151,35 @@ const LiveMarketFeed = () => {
     const interval = setInterval(fetchMarketData, 30000);
 
     return () => clearInterval(interval);
-  }, [visibleCount, loading]);
+  }, [loading, displayedData, visibleCount]);
 
-  // Update displayed data when images are loaded or timeout is reached
+  // Simulate live feed by adding one item at a time
   useEffect(() => {
-    const showNewContent = imagesLoaded || imagesLoadingCount === 0 || forceShowContent;
-    
-    if (showNewContent && marketData.length > 0) {
-      // Update the displayed data with the new data
-      setDisplayedData(marketData);
-      setIsRefreshing(false);
+    if (simulatingLiveFeed && pendingItems.length > 0) {
+      const timer = setTimeout(() => {
+        // Add the next item from the pending queue
+        const nextItem = pendingItems[0];
+        
+        setDisplayedData(prev => {
+          // Add the new item to the beginning
+          const newData = [nextItem, ...prev];
+          // Keep only up to visibleCount items
+          return newData.slice(0, visibleCount);
+        });
+        
+        // Remove the added item from pending items
+        setPendingItems(prev => prev.slice(1));
+        
+        // If no more pending items, we're done with the live feed
+        if (pendingItems.length <= 1) {
+          setSimulatingLiveFeed(false);
+          setIsRefreshing(false);
+        }
+      }, 1000 + Math.random() * 1000); // Random delay between 1-2 seconds
+      
+      return () => clearTimeout(timer);
     }
-  }, [imagesLoaded, imagesLoadingCount, forceShowContent, marketData]);
-
-  // Handle image load completion
-  const handleImageLoaded = () => {
-    setImagesLoadingCount(prev => {
-      const newCount = prev - 1;
-      if (newCount <= 0) {
-        setImagesLoaded(true);
-      }
-      return newCount;
-    });
-  };
-
-  // Handle image load error - count it as loaded to prevent blocking the UI
-  const handleImageError = () => {
-    handleImageLoaded();
-  };
+  }, [simulatingLiveFeed, pendingItems, visibleCount]);
 
   const getRarityColor = (rarity) => {
     switch (rarity?.toLowerCase()) {
@@ -210,11 +210,9 @@ const LiveMarketFeed = () => {
   if (loading) return <div className="loading">Loading market data...</div>;
   if (error) return <div className="error">{error}</div>;
   
-  // Get only the first 12 items to display
-  const visibleItems = displayedData.slice(0, visibleCount);
-
   // Modified renderPrice function with error handling
-  const renderPriceWithErrorHandling = (price, quantity, onLoad) => {
+  const renderPriceWithErrorHandling = (item) => {
+    const { price, quantity } = item;
     if (!price || price <= 0) return null;
     const perPiecePrice = quantity > 0 ? Math.floor(price / quantity) : price;
 
@@ -224,8 +222,6 @@ const LiveMarketFeed = () => {
           src="/images/divider.png" 
           alt="" 
           className="price-divider" 
-          onLoad={onLoad} 
-          onError={handleImageError}
         />
         <div className="price-section">
           <img 
@@ -233,8 +229,6 @@ const LiveMarketFeed = () => {
             alt="gold" 
             className="coin-icon" 
             style={{ width: '24px', height: '24px' }} 
-            onLoad={onLoad} 
-            onError={handleImageError}
           />
           <span className="price-value">{price}</span>
         </div>
@@ -242,8 +236,6 @@ const LiveMarketFeed = () => {
           src="/images/divider.png" 
           alt="" 
           className="price-divider" 
-          onLoad={onLoad} 
-          onError={handleImageError}
         />
         <div className="price-section">
           <img 
@@ -251,8 +243,6 @@ const LiveMarketFeed = () => {
             alt="gold" 
             className="coin-icon" 
             style={{ width: '24px', height: '24px' }} 
-            onLoad={onLoad} 
-            onError={handleImageError}
           />
           <span className="price-value">{perPiecePrice}</span>
           <span className="quantity">x{quantity}</span>
@@ -265,11 +255,12 @@ const LiveMarketFeed = () => {
     <div className="market-feed">
       <h2>Live Market Listings</h2>
       {loading && <div className="loading">Loading market data...</div>}
+      
       <div className="market-grid">
-        {visibleItems.map((item) => (
+        {displayedData.map((item, index) => (
           <div 
             key={item.id} 
-            className="market-item"
+            className={`market-item ${index === 0 && simulatingLiveFeed ? 'new-item' : ''}`}
             onClick={() => navigate(`/${item.item_id}`)}
             style={{ 
               position: 'relative',
@@ -278,11 +269,8 @@ const LiveMarketFeed = () => {
               gap: '15px',
               alignItems: 'center',
               cursor: 'pointer',
-              transition: 'transform 0.2s, box-shadow 0.2s',
-              '&:hover': {
-                transform: 'scale(1.01)',
-                boxShadow: '0px 0px 15px rgba(0, 0, 0, 0.7)'
-              }
+              transition: 'all 0.3s ease',
+              boxShadow: '0px 0px 15px rgba(0, 0, 0, 0.7)',
             }}
           >
             <div 
@@ -301,8 +289,6 @@ const LiveMarketFeed = () => {
               <ItemIcon 
                 itemId={item.item_id} 
                 size={30} 
-                onLoad={handleImageLoaded} 
-                onError={handleImageError}
               />
             </div>
             <div className="item-name" style={{ color: getTextColor(item.rarity) }}>
@@ -317,8 +303,6 @@ const LiveMarketFeed = () => {
                 src="/images/divider.png" 
                 alt="" 
                 className="price-divider" 
-                onLoad={handleImageLoaded}
-                onError={handleImageError}
               />
               <div className="item-rarity" style={{ 
                 color: getTextColor(item.rarity),
@@ -328,11 +312,23 @@ const LiveMarketFeed = () => {
                 {item.rarity}
               </div>
             </div>
-            {renderPriceWithErrorHandling(item.price, item.quantity, handleImageLoaded)}
+            {renderPriceWithErrorHandling(item)}
           </div>
         ))}
       </div>
-      {isRefreshing && displayedData.length > 0 && (
+      
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .new-item {
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          box-shadow: 0px 0px 10px rgba(255, 255, 255, 0.1);
+        }
+      `}</style>
+      
+      {(isRefreshing || simulatingLiveFeed) && displayedData.length > 0 && (
         <div className="refresh-indicator" style={{ 
           textAlign: 'center', 
           padding: '10px', 
@@ -340,7 +336,7 @@ const LiveMarketFeed = () => {
           color: '#888',
           marginTop: '10px'
         }}>
-          Refreshing data...
+          {simulatingLiveFeed ? 'Live feed active...' : 'Refreshing data...'}
         </div>
       )}
     </div>
