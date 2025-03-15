@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { getItemPriceHistory } from '../api/marketApi';
 import PriceChart from './PriceChart';
-import LiveMarketFeed from './LiveMarketFeed';
 
 const ItemPriceHistory = () => {
   const { itemId } = useParams();
@@ -23,6 +22,94 @@ const ItemPriceHistory = () => {
     { value: '1h', label: '1 Hour' },
     { value: '4h', label: '4 Hours' }
   ];
+
+  const renderPrice = (price) => {
+    if (!price) return null;
+    return (
+      <div className="price-value">
+        <span>{price.toFixed(2)}</span>
+        <i className="coin-icon fas fa-coins" />
+      </div>
+    );
+  };
+
+  const renderStats = (priceData, itemName) => {
+    if (!priceData || priceData.length === 0) return null;
+
+    const currentPrice = priceData[priceData.length - 1].avg;
+    
+    // Calculate 24h change
+    const last24hData = priceData.filter(item => {
+      const itemDate = new Date(item.timestamp);
+      const now = new Date(priceData[priceData.length - 1].timestamp);
+      const timeDiff = now - itemDate;
+      const hoursDiff = timeDiff / (1000 * 60 * 60);
+      return hoursDiff <= 24;
+    });
+
+    const oldestIn24h = last24hData[0]?.avg || currentPrice;
+    const priceChange24h = currentPrice - oldestIn24h;
+    const percentChange24h = (priceChange24h / oldestIn24h) * 100;
+
+    // Calculate 7d change
+    const last7dData = priceData.filter(item => {
+      const itemDate = new Date(item.timestamp);
+      const now = new Date(priceData[priceData.length - 1].timestamp);
+      const timeDiff = now - itemDate;
+      const daysDiff = timeDiff / (1000 * 60 * 60 * 24);
+      return daysDiff <= 7;
+    });
+
+    const oldestIn7d = last7dData[0]?.avg || currentPrice;
+    const priceChange7d = currentPrice - oldestIn7d;
+    const percentChange7d = (priceChange7d / oldestIn7d) * 100;
+
+    // Calculate total volume in last 24h
+    const volume24h = last24hData.reduce((sum, item) => sum + item.volume, 0);
+
+    return (
+      <div>
+        {itemName && (
+          <h2 style={{ marginBottom: '1rem' }}>{itemName}</h2>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <div className="stats-container">
+            <div className="stat-card">
+              <div className="stat-label">Current Price</div>
+              <div className="stat-value">
+                {renderPrice(currentPrice)}
+              </div>
+            </div>
+            
+            <div className="stat-card">
+              <div className="stat-label">24h Change</div>
+              <div className="stat-value">
+                {renderPrice(priceChange24h)}
+                <span className={priceChange24h >= 0 ? 'stat-change-positive' : 'stat-change-negative'}>
+                  ({percentChange24h.toFixed(2)}%)
+                </span>
+              </div>
+            </div>
+            
+            <div className="stat-card">
+              <div className="stat-label">7d Change</div>
+              <div className="stat-value">
+                {renderPrice(priceChange7d)}
+                <span className={priceChange7d >= 0 ? 'stat-change-positive' : 'stat-change-negative'}>
+                  ({percentChange7d.toFixed(2)}%)
+                </span>
+              </div>
+            </div>
+            
+            <div className="stat-card">
+              <div className="stat-label">24h Volume</div>
+              <div className="stat-value">{volume24h}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   useEffect(() => {
     let timer;
@@ -169,7 +256,7 @@ const ItemPriceHistory = () => {
         <>
           {/* Always use statsData for consistent stats display */}
           {hasStatsData ? (
-            <LiveMarketFeed.renderStats priceData={statsData} itemName={formatItemName(itemId)} />
+            renderStats(statsData, formatItemName(itemId))
           ) : (
             <div className="loading">
               <p>Loading statistics...</p>
