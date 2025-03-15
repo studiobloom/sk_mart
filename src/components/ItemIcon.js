@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { getItemIconUrl } from '../api/itemsApi';
 
 const ItemIcon = ({ itemId, size = 30, className = '', style = {} }) => {
