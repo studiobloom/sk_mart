@@ -13,9 +13,6 @@ const Header = () => {
       <div className="header-right">
         <nav style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <SearchForm />
-          <h1>
-            <Link to="/">Home</Link>
-          </h1>
         </nav>
       </div>
     </header>

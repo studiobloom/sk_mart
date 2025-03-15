@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import marketApi from '../api/marketApi';
+import ItemIcon from './ItemIcon';
 
 // Helper functions
 export const renderPrice = (totalPrice, quantity = 1) => {
@@ -10,13 +11,13 @@ export const renderPrice = (totalPrice, quantity = 1) => {
     <div className="item-price">
       <img src="/images/divider.png" alt="" className="price-divider" />
       <div className="price-section">
+        <img src="/images/gold.png" alt="gold" className="coin-icon" style={{ width: '24px', height: '24px' }} />
         <span className="price-value">{totalPrice}</span>
-        <i className="coin-icon fas fa-coins" />
       </div>
       <img src="/images/divider.png" alt="" className="price-divider" />
       <div className="price-section">
+        <img src="/images/gold.png" alt="gold" className="coin-icon" style={{ width: '24px', height: '24px' }} />
         <span className="price-value">{perPiecePrice}</span>
-        <i className="coin-icon fas fa-coins" />
         <span className="quantity">x{quantity}</span>
       </div>
     </div>
@@ -136,7 +137,7 @@ const LiveMarketFeed = () => {
         return [255, 232, 129];
       case 'common':
         return [255, 255, 255];
-      case 'poor':
+      default:
         return [120, 120, 120];
     }
   };
@@ -191,9 +192,7 @@ const LiveMarketFeed = () => {
               }}
             />
             <div className="item-image">
-              <div className="item-icon" style={{ backgroundColor: '#333' }}>
-                {item.item_id?.charAt(0) || '?'}
-              </div>
+              <ItemIcon itemId={item.item_id} size={30} />
             </div>
             <div className="item-name" style={{ color: getTextColor(item.rarity) }}>
               {item.item}

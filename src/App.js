@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import ItemPriceHistory from './components/ItemPriceHistory';
 import Header from './components/Header';
-import SearchForm from './components/SearchForm';
 import ApiErrorFallback from './components/ApiErrorFallback';
 import LiveMarketFeed from './components/LiveMarketFeed';
 

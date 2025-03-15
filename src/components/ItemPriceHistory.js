@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { getItemPriceHistory } from '../api/marketApi';
 import PriceChart from './PriceChart';
+import ItemIcon from './ItemIcon';
 
 const ItemPriceHistory = () => {
   const { itemId } = useParams();
@@ -27,8 +28,8 @@ const ItemPriceHistory = () => {
     if (!price) return null;
     return (
       <div className="price-value">
+        <img src="/images/gold.png" alt="gold" className="coin-icon" style={{ width: '24px', height: '24px', marginRight: '4px' }} />
         <span>{price.toFixed(2)}</span>
-        <i className="coin-icon fas fa-coins" />
       </div>
     );
   };
@@ -68,43 +69,38 @@ const ItemPriceHistory = () => {
     const volume24h = last24hData.reduce((sum, item) => sum + item.volume, 0);
 
     return (
-      <div>
-        {itemName && (
-          <h2 style={{ marginBottom: '1rem' }}>{itemName}</h2>
-        )}
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <div className="stats-container">
-            <div className="stat-card">
-              <div className="stat-label">Current Price</div>
-              <div className="stat-value">
-                {renderPrice(currentPrice)}
-              </div>
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <div className="stats-container">
+          <div className="stat-card">
+            <div className="stat-label">Current Price</div>
+            <div className="stat-value">
+              {renderPrice(currentPrice)}
             </div>
-            
-            <div className="stat-card">
-              <div className="stat-label">24h Change</div>
-              <div className="stat-value">
-                {renderPrice(priceChange24h)}
-                <span className={priceChange24h >= 0 ? 'stat-change-positive' : 'stat-change-negative'}>
-                  ({percentChange24h.toFixed(2)}%)
-                </span>
-              </div>
+          </div>
+          
+          <div className="stat-card">
+            <div className="stat-label">24h Change</div>
+            <div className="stat-value">
+              {renderPrice(priceChange24h)}
+              <span className={priceChange24h >= 0 ? 'stat-change-positive' : 'stat-change-negative'}>
+                ({percentChange24h.toFixed(2)}%)
+              </span>
             </div>
-            
-            <div className="stat-card">
-              <div className="stat-label">7d Change</div>
-              <div className="stat-value">
-                {renderPrice(priceChange7d)}
-                <span className={priceChange7d >= 0 ? 'stat-change-positive' : 'stat-change-negative'}>
-                  ({percentChange7d.toFixed(2)}%)
-                </span>
-              </div>
+          </div>
+          
+          <div className="stat-card">
+            <div className="stat-label">7d Change</div>
+            <div className="stat-value">
+              {renderPrice(priceChange7d)}
+              <span className={priceChange7d >= 0 ? 'stat-change-positive' : 'stat-change-negative'}>
+                ({percentChange7d.toFixed(2)}%)
+              </span>
             </div>
-            
-            <div className="stat-card">
-              <div className="stat-label">24h Volume</div>
-              <div className="stat-value">{volume24h}</div>
-            </div>
+          </div>
+          
+          <div className="stat-card">
+            <div className="stat-label">24h Volume</div>
+            <div className="stat-value">{volume24h}</div>
           </div>
         </div>
       </div>
@@ -247,13 +243,15 @@ const ItemPriceHistory = () => {
 
   return (
     <div className="container">
-      <div className="item-header">
-      </div>
-      
       {priceError && !shouldShowChart ? (
         <div className="error">{priceError}</div>
       ) : (
         <>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2rem' }}>
+            <h2 style={{ margin: 0 }}>{formatItemName(itemId)}</h2>
+            <ItemIcon itemId={itemId} size={40} style={{ marginLeft: '10px' }} />
+          </div>
+
           {/* Always use statsData for consistent stats display */}
           {hasStatsData ? (
             renderStats(statsData, formatItemName(itemId))
