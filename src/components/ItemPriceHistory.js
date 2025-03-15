@@ -15,6 +15,9 @@ const ItemPriceHistory = () => {
   const [dataLoaded, setDataLoaded] = useState(false);
   const [selectedInterval, setSelectedInterval] = useState('1h');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [imagesLoaded, setImagesLoaded] = useState(false);
+  const [imagesLoadingCount, setImagesLoadingCount] = useState(0);
+  const [forceShowContent, setForceShowContent] = useState(false);
 
   const availableIntervals = [
     { value: '5m', label: '5 Min' },
@@ -24,11 +27,34 @@ const ItemPriceHistory = () => {
     { value: '4h', label: '4 Hours' }
   ];
 
+  // Handle image load completion
+  const handleImageLoaded = () => {
+    setImagesLoadingCount(prev => {
+      const newCount = prev - 1;
+      if (newCount <= 0) {
+        setImagesLoaded(true);
+      }
+      return newCount;
+    });
+  };
+
+  // Handle image load error - count it as loaded to prevent blocking the UI
+  const handleImageError = () => {
+    handleImageLoaded();
+  };
+
   const renderPrice = (price) => {
     if (!price) return null;
     return (
       <div className="price-value">
-        <img src="/images/gold.png" alt="gold" className="coin-icon" style={{ width: '24px', height: '24px', marginRight: '4px' }} />
+        <img 
+          src="/images/gold.png" 
+          alt="gold" 
+          className="coin-icon" 
+          style={{ width: '24px', height: '24px', marginRight: '4px' }} 
+          onLoad={handleImageLoaded}
+          onError={handleImageError}
+        />
         <span>{price.toFixed(2)}</span>
       </div>
     );
@@ -134,6 +160,18 @@ const ItemPriceHistory = () => {
       );
       
       setStatsData(sortedData);
+      
+      // Reset image loading state when new data arrives
+      setImagesLoaded(false);
+      setForceShowContent(false);
+      // Calculate total number of images to load (1 ItemIcon + 3 gold coins in renderPrice)
+      setImagesLoadingCount(4);
+      
+      // Set a timeout to force show content after 3 seconds even if images haven't loaded
+      setTimeout(() => {
+        setForceShowContent(true);
+      }, 3000);
+      
       return true;
     } catch (err) {
       console.error(`Error fetching stats data:`, err);
@@ -232,6 +270,7 @@ const ItemPriceHistory = () => {
 
   const shouldShowChart = chartData.length > 0;
   const hasStatsData = statsData.length > 0;
+  const showContent = imagesLoaded || imagesLoadingCount === 0 || forceShowContent;
 
   if (priceError && !shouldShowChart && !hasStatsData) {
     return (
@@ -247,48 +286,57 @@ const ItemPriceHistory = () => {
         <div className="error">{priceError}</div>
       ) : (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2rem' }}>
-            <h2 style={{ margin: 0 }}>{formatItemName(itemId)}</h2>
-            <ItemIcon itemId={itemId} size={40} style={{ marginLeft: '10px' }} />
-          </div>
+          {!showContent && <div className="loading">Loading item images...</div>}
+          <div style={{ display: showContent ? 'block' : 'none' }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2rem' }}>
+              <h2 style={{ margin: 0 }}>{formatItemName(itemId)}</h2>
+              <ItemIcon 
+                itemId={itemId} 
+                size={40} 
+                style={{ marginLeft: '10px' }} 
+                onLoad={handleImageLoaded} 
+                onError={handleImageError}
+              />
+            </div>
 
-          {/* Always use statsData for consistent stats display */}
-          {hasStatsData ? (
-            renderStats(statsData, formatItemName(itemId))
-          ) : (
-            <div className="loading">
-              <p>Loading statistics...</p>
-            </div>
-          )}
-          
-          <div className="card">
-            <div className="chart-header">
-              <h2>Market History</h2>
-              <div className="interval-selector">
-                {availableIntervals.map(interval => (
-                  <button
-                    key={interval.value}
-                    className={`interval-button ${selectedInterval === interval.value ? 'active' : ''}`}
-                    onClick={() => handleIntervalChange(interval.value)}
-                    disabled={isRefreshing}
-                  >
-                    {interval.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            
-            {isRefreshing ? (
-              <div className="loading">
-                <p>Updating chart data...</p>
-              </div>
-            ) : shouldShowChart ? (
-              <PriceChart priceData={chartData} selectedInterval={selectedInterval} />
+            {/* Always use statsData for consistent stats display */}
+            {hasStatsData ? (
+              renderStats(statsData, formatItemName(itemId))
             ) : (
               <div className="loading">
-                <p>No price data available for the selected interval.</p>
+                <p>Loading statistics...</p>
               </div>
             )}
+            
+            <div className="card">
+              <div className="chart-header">
+                <h2>Market History</h2>
+                <div className="interval-selector">
+                  {availableIntervals.map(interval => (
+                    <button
+                      key={interval.value}
+                      className={`interval-button ${selectedInterval === interval.value ? 'active' : ''}`}
+                      onClick={() => handleIntervalChange(interval.value)}
+                      disabled={isRefreshing}
+                    >
+                      {interval.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              {isRefreshing ? (
+                <div className="loading">
+                  <p>Updating chart data...</p>
+                </div>
+              ) : shouldShowChart ? (
+                <PriceChart priceData={chartData} selectedInterval={selectedInterval} />
+              ) : (
+                <div className="loading">
+                  <p>No price data available for the selected interval.</p>
+                </div>
+              )}
+            </div>
           </div>
         </>
       )}

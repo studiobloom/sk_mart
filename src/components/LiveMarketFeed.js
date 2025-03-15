@@ -1,22 +1,23 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import marketApi from '../api/marketApi';
 import ItemIcon from './ItemIcon';
 
 // Helper functions
-export const renderPrice = (totalPrice, quantity = 1) => {
+export const renderPrice = (totalPrice, quantity = 1, onImageLoad) => {
   if (!totalPrice || totalPrice <= 0) return null;
   const perPiecePrice = quantity > 0 ? Math.floor(totalPrice / quantity) : totalPrice;
 
   return (
     <div className="item-price">
-      <img src="/images/divider.png" alt="" className="price-divider" />
+      <img src="/images/divider.png" alt="" className="price-divider" onLoad={onImageLoad} />
       <div className="price-section">
-        <img src="/images/gold.png" alt="gold" className="coin-icon" style={{ width: '24px', height: '24px' }} />
+        <img src="/images/gold.png" alt="gold" className="coin-icon" style={{ width: '24px', height: '24px' }} onLoad={onImageLoad} />
         <span className="price-value">{totalPrice}</span>
       </div>
-      <img src="/images/divider.png" alt="" className="price-divider" />
+      <img src="/images/divider.png" alt="" className="price-divider" onLoad={onImageLoad} />
       <div className="price-section">
-        <img src="/images/gold.png" alt="gold" className="coin-icon" style={{ width: '24px', height: '24px' }} />
+        <img src="/images/gold.png" alt="gold" className="coin-icon" style={{ width: '24px', height: '24px' }} onLoad={onImageLoad} />
         <span className="price-value">{perPiecePrice}</span>
         <span className="quantity">x{quantity}</span>
       </div>
@@ -24,7 +25,7 @@ export const renderPrice = (totalPrice, quantity = 1) => {
   );
 };
 
-export const renderStats = (priceData, itemName) => {
+export const renderStats = (priceData, itemName, onImageLoad) => {
   if (!priceData || priceData.length === 0) return null;
 
   const currentPrice = priceData[priceData.length - 1].avg;
@@ -68,7 +69,7 @@ export const renderStats = (priceData, itemName) => {
           <div className="stat-card">
             <div className="stat-label">Current Price</div>
             <div className="stat-value">
-              {renderPrice(currentPrice, 1)}
+              {renderPrice(currentPrice, 1, onImageLoad)}
             </div>
           </div>
           
@@ -97,19 +98,50 @@ export const renderStats = (priceData, itemName) => {
 };
 
 const LiveMarketFeed = () => {
+  const navigate = useNavigate();
   const [marketData, setMarketData] = useState([]);
+  const [displayedData, setDisplayedData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [imagesLoaded, setImagesLoaded] = useState(false);
+  const [imagesLoadingCount, setImagesLoadingCount] = useState(0);
+  const [visibleCount] = useState(10);
+  const [forceShowContent, setForceShowContent] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     const fetchMarketData = async () => {
       try {
+        setIsRefreshing(true);
         const response = await marketApi.getLiveMarketData();
+        
+        // Store the new data but don't display it yet
         setMarketData(response.body);
-        setLoading(false);
+        
+        if (loading) {
+          // First load - nothing to display yet
+          setLoading(false);
+        }
+        
+        // Reset image loading state for new data
+        setImagesLoaded(false);
+        setForceShowContent(false);
+        
+        // Calculate total number of images to load for the visible items only
+        // Each item has: 1 ItemIcon + 1 divider in the rarity section + 4 images in renderPrice (2 dividers + 2 gold coins)
+        const itemsToShow = response.body.slice(0, visibleCount);
+        setImagesLoadingCount(itemsToShow.length * 6);
+        
+        // Set a timeout to force show content after 3 seconds even if images haven't loaded
+        const timeoutId = setTimeout(() => {
+          setForceShowContent(true);
+        }, 3000);
+        
+        return () => clearTimeout(timeoutId);
       } catch (err) {
         setError(err.message);
         setLoading(false);
+        setIsRefreshing(false);
       }
     };
 
@@ -120,9 +152,35 @@ const LiveMarketFeed = () => {
     const interval = setInterval(fetchMarketData, 30000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [visibleCount, loading]);
 
-  // Helper function to get background color based on rarity
+  // Update displayed data when images are loaded or timeout is reached
+  useEffect(() => {
+    const showNewContent = imagesLoaded || imagesLoadingCount === 0 || forceShowContent;
+    
+    if (showNewContent && marketData.length > 0) {
+      // Update the displayed data with the new data
+      setDisplayedData(marketData);
+      setIsRefreshing(false);
+    }
+  }, [imagesLoaded, imagesLoadingCount, forceShowContent, marketData]);
+
+  // Handle image load completion
+  const handleImageLoaded = () => {
+    setImagesLoadingCount(prev => {
+      const newCount = prev - 1;
+      if (newCount <= 0) {
+        setImagesLoaded(true);
+      }
+      return newCount;
+    });
+  };
+
+  // Handle image load error - count it as loaded to prevent blocking the UI
+  const handleImageError = () => {
+    handleImageLoaded();
+  };
+
   const getRarityColor = (rarity) => {
     switch (rarity?.toLowerCase()) {
       case 'legendary':
@@ -142,41 +200,89 @@ const LiveMarketFeed = () => {
     }
   };
 
-  // Helper function to determine text color based on rarity background
   const getTextColor = (rarity) => {
-    switch (rarity?.toLowerCase()) {
-      case 'legendary':
-        return '#ffdf00'; // bright gold
-      case 'epic':
-        return '#e0b0ff'; // light purple
-      case 'rare':
-        return '#add8e6'; // light blue
-      case 'uncommon':
-        return '#90ee90'; // light green
-      case 'unique':
-        return '#d4d4aa'; // light olive
-      default:
-        return '#d3d3d3'; // light gray
-    }
+    // Get the same RGB values from getRarityColor
+    const rgbArray = getRarityColor(rarity);
+    // Convert the RGB array to a CSS color string
+    return `rgb(${rgbArray[0]}, ${rgbArray[1]}, ${rgbArray[2]})`;
   };
 
   if (loading) return <div className="loading">Loading market data...</div>;
   if (error) return <div className="error">{error}</div>;
+  
+  // Get only the first 12 items to display
+  const visibleItems = displayedData.slice(0, visibleCount);
+
+  // Modified renderPrice function with error handling
+  const renderPriceWithErrorHandling = (price, quantity, onLoad) => {
+    if (!price || price <= 0) return null;
+    const perPiecePrice = quantity > 0 ? Math.floor(price / quantity) : price;
+
+    return (
+      <div className="item-price">
+        <img 
+          src="/images/divider.png" 
+          alt="" 
+          className="price-divider" 
+          onLoad={onLoad} 
+          onError={handleImageError}
+        />
+        <div className="price-section">
+          <img 
+            src="/images/gold.png" 
+            alt="gold" 
+            className="coin-icon" 
+            style={{ width: '24px', height: '24px' }} 
+            onLoad={onLoad} 
+            onError={handleImageError}
+          />
+          <span className="price-value">{price}</span>
+        </div>
+        <img 
+          src="/images/divider.png" 
+          alt="" 
+          className="price-divider" 
+          onLoad={onLoad} 
+          onError={handleImageError}
+        />
+        <div className="price-section">
+          <img 
+            src="/images/gold.png" 
+            alt="gold" 
+            className="coin-icon" 
+            style={{ width: '24px', height: '24px' }} 
+            onLoad={onLoad} 
+            onError={handleImageError}
+          />
+          <span className="price-value">{perPiecePrice}</span>
+          <span className="quantity">x{quantity}</span>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="market-feed">
       <h2>Live Market Listings</h2>
+      {loading && <div className="loading">Loading market data...</div>}
       <div className="market-grid">
-        {marketData.map((item) => (
+        {visibleItems.map((item) => (
           <div 
             key={item.id} 
             className="market-item"
+            onClick={() => navigate(`/${item.item_id}`)}
             style={{ 
               position: 'relative',
               display: 'grid',
               gridTemplateColumns: '50px minmax(0, 1fr) 120px auto',
               gap: '15px',
-              alignItems: 'center'
+              alignItems: 'center',
+              cursor: 'pointer',
+              transition: 'transform 0.2s, box-shadow 0.2s',
+              '&:hover': {
+                transform: 'scale(1.01)',
+                boxShadow: '0px 0px 15px rgba(0, 0, 0, 0.7)'
+              }
             }}
           >
             <div 
@@ -192,7 +298,12 @@ const LiveMarketFeed = () => {
               }}
             />
             <div className="item-image">
-              <ItemIcon itemId={item.item_id} size={30} />
+              <ItemIcon 
+                itemId={item.item_id} 
+                size={30} 
+                onLoad={handleImageLoaded} 
+                onError={handleImageError}
+              />
             </div>
             <div className="item-name" style={{ color: getTextColor(item.rarity) }}>
               {item.item}
@@ -202,7 +313,13 @@ const LiveMarketFeed = () => {
               alignItems: 'center',
               gap: '8px'
             }}>
-              <img src="/images/divider.png" alt="" className="price-divider" />
+              <img 
+                src="/images/divider.png" 
+                alt="" 
+                className="price-divider" 
+                onLoad={handleImageLoaded}
+                onError={handleImageError}
+              />
               <div className="item-rarity" style={{ 
                 color: getTextColor(item.rarity),
                 textAlign: 'right',
@@ -211,10 +328,21 @@ const LiveMarketFeed = () => {
                 {item.rarity}
               </div>
             </div>
-            {renderPrice(item.price, item.quantity)}
+            {renderPriceWithErrorHandling(item.price, item.quantity, handleImageLoaded)}
           </div>
         ))}
       </div>
+      {isRefreshing && displayedData.length > 0 && (
+        <div className="refresh-indicator" style={{ 
+          textAlign: 'center', 
+          padding: '10px', 
+          fontSize: '0.8rem', 
+          color: '#888',
+          marginTop: '10px'
+        }}>
+          Refreshing data...
+        </div>
+      )}
     </div>
   );
 };

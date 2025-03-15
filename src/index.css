@@ -579,10 +579,17 @@ h2 {
   height: 60px;
   background: var(--border-frame),linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgb(7, 7, 7) 100%);
   box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.5);
+  text-shadow: 0px 0px 5px rgba(0, 0, 0, 0.8);
   border-radius: 0;
-  transition: transform 0.2s;
+  transition: all 0.2s ease;
   align-items: center;
   gap: 15px;
+  cursor: pointer;
+}
+
+.market-item:hover {
+  box-shadow: 0px 0px 15px #beb06036;
+  background: var(--border-frame),linear-gradient(to right, rgba(0, 0, 0, 0.1) 0%, rgb(104, 104, 104, 0.5) 100%);
 }
 
 .item-image {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { getItemIconUrl } from '../api/itemsApi';
 
-const ItemIcon = ({ itemId, size = 30, className = '', style = {} }) => {
+const ItemIcon = ({ itemId, size = 30, className = '', style = {}, onLoad, onError }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -22,26 +22,36 @@ const ItemIcon = ({ itemId, size = 30, className = '', style = {} }) => {
 
   // Styles for the actual image
   const imageStyle = {
-    width: '120%',
-    height: '120%',
+    width: '125%',
+    height: '125%',
     objectFit: 'contain',
-    opacity: loading ? 0 : 1,
-    transition: 'opacity 0.2s ease'
+    opacity: loading ? 0.5 : 1,
+    transition: 'opacity 0.2s ease',
+    filter: 'drop-shadow(0 0 5px rgba(0, 0, 0, 0.8))'
   };
-
-  // Fallback content (first letter of item ID)
-  const fallbackContent = itemId?.charAt(0)?.toUpperCase() || '?';
 
   // Handle image load success
   const handleLoad = () => {
     setLoading(false);
     setError(false);
+    // Call external onLoad handler if provided
+    if (onLoad && typeof onLoad === 'function') {
+      onLoad();
+    }
   };
 
   // Handle image load error
   const handleError = () => {
     setLoading(false);
     setError(true);
+    // Even on error, we should call the onLoad handler to decrement the counter
+    if (onLoad && typeof onLoad === 'function') {
+      onLoad();
+    }
+    // Call external onError handler if provided
+    if (onError && typeof onError === 'function') {
+      onError();
+    }
   };
 
   return (
@@ -55,21 +65,17 @@ const ItemIcon = ({ itemId, size = 30, className = '', style = {} }) => {
           onError={handleError}
         />
       )}
-      {(loading || error) && (
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          display: 'flex',
-          alignItems: 'center',
+      {error && (
+        <div style={{ 
+          width: '100%', 
+          height: '100%', 
+          display: 'flex', 
+          alignItems: 'center', 
           justifyContent: 'center',
-          color: 'var(--gold)',
-          fontSize: `${size * 0.5}px`,
-          fontWeight: 'bold'
+          backgroundColor: 'rgba(0,0,0,0.2)',
+          borderRadius: '4px'
         }}>
-          {fallbackContent}
+          ?
         </div>
       )}
     </div>
