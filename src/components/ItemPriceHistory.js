@@ -16,9 +16,6 @@ const ItemPriceHistory = () => {
   const [dataLoaded, setDataLoaded] = useState(false);
   const [selectedInterval, setSelectedInterval] = useState('1h');
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [imagesLoaded, setImagesLoaded] = useState(false);
-  const [imagesLoadingCount, setImagesLoadingCount] = useState(0);
-  const [forceShowContent, setForceShowContent] = useState(false);
 
   const availableIntervals = [
     { value: '5m', label: '5 Min' },
@@ -27,22 +24,6 @@ const ItemPriceHistory = () => {
     { value: '1h', label: '1 Hour' },
     { value: '4h', label: '4 Hours' }
   ];
-
-  // Handle image load completion
-  const handleImageLoaded = () => {
-    setImagesLoadingCount(prev => {
-      const newCount = prev - 1;
-      if (newCount <= 0) {
-        setImagesLoaded(true);
-      }
-      return newCount;
-    });
-  };
-
-  // Handle image load error - count it as loaded to prevent blocking the UI
-  const handleImageError = () => {
-    handleImageLoaded();
-  };
 
   const renderPrice = (price) => {
     if (!price) return null;
@@ -53,8 +34,6 @@ const ItemPriceHistory = () => {
           alt="gold" 
           className="coin-icon" 
           style={{ width: '24px', height: '24px', marginRight: '4px' }} 
-          onLoad={handleImageLoaded}
-          onError={handleImageError}
         />
         <span>{price.toFixed(2)}</span>
       </div>
@@ -210,16 +189,6 @@ const ItemPriceHistory = () => {
         }
         
         if (success) {
-          // Reset image loading state
-          setImagesLoaded(false);
-          setForceShowContent(false);
-          setImagesLoadingCount(4);
-          
-          // Set a timeout to force show content after 3 seconds
-          setTimeout(() => {
-            setForceShowContent(true);
-          }, 3000);
-          
           setDataLoaded(true);
         } else {
           setPriceError('Failed to fetch data. Please check if the item name is correct.');
@@ -300,8 +269,6 @@ const ItemPriceHistory = () => {
             itemId={itemId} 
             size={40} 
             style={{ marginLeft: '10px' }} 
-            onLoad={handleImageLoaded} 
-            onError={handleImageError}
           />
         </div>
 
