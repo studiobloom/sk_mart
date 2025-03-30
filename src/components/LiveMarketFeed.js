@@ -144,7 +144,7 @@ const LiveMarketFeed = () => {
   // Initial load
   useEffect(() => {
     fetchMarketData(1);
-  }, []);
+  }, [fetchMarketData]);
 
   // Handle page changes
   useEffect(() => {

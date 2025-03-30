@@ -282,7 +282,6 @@ const ItemPriceHistory = () => {
 
   const shouldShowChart = chartData.length > 0;
   const hasStatsData = statsData.length > 0;
-  const showContent = imagesLoaded || imagesLoadingCount === 0 || forceShowContent;
 
   if (priceError && !shouldShowChart && !hasStatsData) {
     return (
