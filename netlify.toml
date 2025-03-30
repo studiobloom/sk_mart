@@ -10,6 +10,13 @@
   status = 200
   force = true
 
+# This redirect handles DarkerDB API requests
+[[redirects]]
+  from = "/v1/*"
+  to = "https://api.darkerdb.com/v1/:splat"
+  status = 200
+  force = true
+
 # This handles client-side routing in SPA
 [[redirects]]
   from = "/*"

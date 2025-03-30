@@ -2,10 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { getItemPriceHistory } from '../api/marketApi';
 import PriceChart from './PriceChart';
-import ItemStats from './ItemStats';
+import ItemIcon from './ItemIcon';
 
 const ItemPriceHistory = () => {
   const { itemId } = useParams();
+  const [hasFetched, setHasFetched] = useState(false);
   
   const [chartData, setChartData] = useState([]);
   const [statsData, setStatsData] = useState([]);
@@ -24,6 +25,94 @@ const ItemPriceHistory = () => {
     { value: '4h', label: '4 Hours' }
   ];
 
+  const renderPrice = (price) => {
+    if (!price) return null;
+    return (
+      <div className="price-value">
+        <img 
+          src="/images/gold.png" 
+          alt="gold" 
+          className="coin-icon" 
+          style={{ width: '24px', height: '24px', marginRight: '4px' }} 
+        />
+        <span>{price.toFixed(2)}</span>
+      </div>
+    );
+  };
+
+  const renderStats = (priceData, itemName) => {
+    if (!priceData || priceData.length === 0) return null;
+
+    const currentPrice = priceData[priceData.length - 1].avg;
+    
+    // Calculate 24h change
+    const last24hData = priceData.filter(item => {
+      const itemDate = new Date(item.timestamp);
+      const now = new Date(priceData[priceData.length - 1].timestamp);
+      const timeDiff = now - itemDate;
+      const hoursDiff = timeDiff / (1000 * 60 * 60);
+      return hoursDiff <= 24;
+    });
+
+    const oldestIn24h = last24hData[0]?.avg || currentPrice;
+    const priceChange24h = currentPrice - oldestIn24h;
+    const percentChange24h = (priceChange24h / oldestIn24h) * 100;
+
+    // Calculate 7d change
+    const last7dData = priceData.filter(item => {
+      const itemDate = new Date(item.timestamp);
+      const now = new Date(priceData[priceData.length - 1].timestamp);
+      const timeDiff = now - itemDate;
+      const daysDiff = timeDiff / (1000 * 60 * 60 * 24);
+      return daysDiff <= 7;
+    });
+
+    const oldestIn7d = last7dData[0]?.avg || currentPrice;
+    const priceChange7d = currentPrice - oldestIn7d;
+    const percentChange7d = (priceChange7d / oldestIn7d) * 100;
+
+    // Calculate total volume in last 24h
+    const volume24h = last24hData.reduce((sum, item) => sum + item.volume, 0);
+
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <div className="stats-container">
+          <div className="stat-card">
+            <div className="stat-label">Current Price</div>
+            <div className="stat-value">
+              {renderPrice(currentPrice)}
+            </div>
+          </div>
+          
+          <div className="stat-card">
+            <div className="stat-label">24h Change</div>
+            <div className="stat-value">
+              {renderPrice(priceChange24h)}
+              <span className={priceChange24h >= 0 ? 'stat-change-positive' : 'stat-change-negative'}>
+                ({percentChange24h.toFixed(2)}%)
+              </span>
+            </div>
+          </div>
+          
+          <div className="stat-card">
+            <div className="stat-label">7d Change</div>
+            <div className="stat-value">
+              {renderPrice(priceChange7d)}
+              <span className={priceChange7d >= 0 ? 'stat-change-positive' : 'stat-change-negative'}>
+                ({percentChange7d.toFixed(2)}%)
+              </span>
+            </div>
+          </div>
+          
+          <div className="stat-card">
+            <div className="stat-label">24h Volume</div>
+            <div className="stat-value">{volume24h}</div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   useEffect(() => {
     let timer;
     if (loading) {
@@ -39,83 +128,96 @@ const ItemPriceHistory = () => {
     };
   }, [loading]);
 
-  // Fetch stats data (always using 1h interval for consistency)
-  const fetchStatsData = useCallback(async () => {
-    try {
-      // Always use 1h interval for stats to ensure consistency
-      const response = await getItemPriceHistory(itemId, '1h');
-      const data = response.body || [];
-      
-      const sortedData = [...data].sort((a, b) => 
-        new Date(a.timestamp) - new Date(b.timestamp)
-      );
-      
-      setStatsData(sortedData);
-      return true;
-    } catch (err) {
-      console.error(`Error fetching stats data:`, err);
-      return false;
-    }
-  }, [itemId]);
-
-  // Fetch chart data with the selected interval
-  const fetchChartData = useCallback(async () => {
+  // Fetch data with a specific interval
+  const fetchData = useCallback(async (interval) => {
     setIsRefreshing(true);
     
     try {
-      const response = await getItemPriceHistory(itemId, selectedInterval);
-      const data = response.body || [];
+      console.log(`Fetching data with interval ${interval}...`);
+      const response = await getItemPriceHistory(itemId, interval);
       
+      // Check if we got valid data back
+      if (!response || !response.body || !Array.isArray(response.body) || response.body.length === 0) {
+        console.error(`No valid data returned for ${itemId} with interval ${interval}`);
+        setIsRefreshing(false);
+        return false;
+      }
+      
+      const data = response.body;
       const sortedData = [...data].sort((a, b) => 
         new Date(a.timestamp) - new Date(b.timestamp)
       );
       
+      // If this is the '1h' interval (used for stats)
+      if (interval === '1h') {
+        setStatsData(sortedData);
+      }
+      
+      // Always update chart data with the requested interval
       setChartData(sortedData);
       setIsRefreshing(false);
       return true;
     } catch (err) {
-      console.error(`Error fetching ${selectedInterval} interval data:`, err);
-      setPriceError(`Failed to fetch price history for interval ${selectedInterval}. Please try another interval.`);
+      console.error(`Error fetching ${interval} interval data:`, err);
+      setPriceError(`Failed to fetch price history for interval ${interval}. Please try another interval.`);
       setIsRefreshing(false);
       return false;
     }
-  }, [itemId, selectedInterval]);
+  }, [itemId]);
 
-  // Initial data load
+  // Single effect to handle all data loading
   useEffect(() => {
-    if (itemId) {
+    // Skip if no itemId
+    if (!itemId) return;
+    
+    // Skip if we've already fetched for this item
+    if (hasFetched) return;
+    
+    const fetchInitialData = async () => {
       setLoading(true);
       setPriceError(null);
+      setDataLoaded(false);
       
-      const loadData = async () => {
-        // First load stats data (1h interval)
-        const statsSuccess = await fetchStatsData();
+      try {
+        console.log(`Initial data fetch for ${itemId} with interval ${selectedInterval}`);
+        // Make a single API call for the initial data
+        const success = await fetchData(selectedInterval);
         
-        // Then load chart data with selected interval
-        const chartSuccess = await fetchChartData();
-        
-        if (statsSuccess && chartSuccess) {
-          setDataLoaded(true);
-        } else if (!statsSuccess && !chartSuccess) {
-          setPriceError('Failed to fetch any data. Please check if the item name is correct.');
+        // If we need 1h data for stats and selectedInterval isn't 1h, fetch that too
+        if (success && selectedInterval !== '1h') {
+          await fetchData('1h');
         }
         
+        if (success) {
+          setDataLoaded(true);
+        } else {
+          setPriceError('Failed to fetch data. Please check if the item name is correct.');
+        }
+      } catch (err) {
+        console.error(`Error during initial data load:`, err);
+        setPriceError('An error occurred while loading data.');
+      } finally {
         setLoading(false);
-      };
-      
-      loadData();
-    }
-  }, [itemId, fetchStatsData, fetchChartData]); // Include the callback functions as dependencies
+        setHasFetched(true);
+      }
+    };
+    
+    fetchInitialData();
+  }, [itemId, selectedInterval, fetchData, hasFetched]);
 
-  // When interval changes, only update chart data
+  // Reset fetch flag when itemId changes
   useEffect(() => {
-    if (itemId && dataLoaded) {
-      fetchChartData();
-    }
-  }, [selectedInterval, itemId, dataLoaded, fetchChartData]);
+    setHasFetched(false);
+  }, [itemId]);
 
   const handleIntervalChange = (interval) => {
     if (interval !== selectedInterval) {
+      // Call fetchData with the new interval directly
+      if (itemId && dataLoaded) {
+        fetchData(interval);
+      }
+      
+      // Update the state
       setSelectedInterval(interval);
     }
   };
@@ -160,53 +262,96 @@ const ItemPriceHistory = () => {
 
   return (
     <div className="container">
-      <div className="item-header">
-      </div>
-      
-      {priceError && !shouldShowChart ? (
-        <div className="error">{priceError}</div>
-      ) : (
-        <>
-          {/* Always use statsData for consistent stats display */}
-          {hasStatsData ? (
-            <ItemStats priceData={statsData} itemName={formatItemName(itemId)} />
-          ) : (
-            <div className="loading">
+      <div className="content">
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2rem' }}>
+          <h2 style={{ margin: 0 }}>{formatItemName(itemId)}</h2>
+          <ItemIcon 
+            itemId={itemId} 
+            size={40} 
+            style={{ marginLeft: '10px' }} 
+          />
+        </div>
+
+        {/* Stats section */}
+        <div className="stats-section">
+          {loading ? (
+            <div className="loading-overlay">
               <p>Loading statistics...</p>
             </div>
-          )}
-          
-          <div className="card">
-            <div className="chart-header">
-              <h2>Market History</h2>
-              <div className="interval-selector">
-                {availableIntervals.map(interval => (
-                  <button
-                    key={interval.value}
-                    className={`interval-button ${selectedInterval === interval.value ? 'active' : ''}`}
-                    onClick={() => handleIntervalChange(interval.value)}
-                    disabled={isRefreshing}
-                  >
-                    {interval.label}
-                  </button>
-                ))}
-              </div>
+          ) : hasStatsData ? (
+            renderStats(statsData, formatItemName(itemId))
+          ) : priceError ? (
+            <div className="error">{priceError}</div>
+          ) : null}
+        </div>
+        
+        <div className="card">
+          <div className="chart-header">
+            <h2>Market History</h2>
+            <div className="interval-selector">
+              {availableIntervals.map(interval => (
+                <button
+                  key={interval.value}
+                  className={`interval-button ${selectedInterval === interval.value ? 'active' : ''}`}
+                  onClick={() => handleIntervalChange(interval.value)}
+                  disabled={isRefreshing}
+                >
+                  {interval.label}
+                </button>
+              ))}
             </div>
-            
-            {isRefreshing ? (
-              <div className="loading">
+          </div>
+          
+          <div className="chart-container" style={{ position: 'relative', minHeight: '300px' }}>
+            {isRefreshing && (
+              <div className="loading-overlay">
                 <p>Updating chart data...</p>
               </div>
-            ) : shouldShowChart ? (
+            )}
+            {shouldShowChart ? (
               <PriceChart priceData={chartData} selectedInterval={selectedInterval} />
+            ) : loading ? (
+              <div className="loading-overlay">
+                <p>Loading price history...</p>
+              </div>
             ) : (
-              <div className="loading">
+              <div className="no-data">
                 <p>No price data available for the selected interval.</p>
               </div>
             )}
           </div>
-        </>
-      )}
+        </div>
+      </div>
+
+      <style jsx>{`
+        .content {
+          opacity: 1;
+          transition: opacity 0.3s ease;
+        }
+        .loading-overlay {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(0, 0, 0, 0.7);
+          border-radius: 4px;
+        }
+        .stats-section {
+          position: relative;
+          min-height: 100px;
+        }
+        .no-data {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 300px;
+          color: #666;
+        }
+      `}</style>
     </div>
   );
 };
