@@ -294,64 +294,98 @@ const ItemPriceHistory = () => {
 
   return (
     <div className="container">
-      {priceError && !shouldShowChart ? (
-        <div className="error">{priceError}</div>
-      ) : (
-        <>
-          {!showContent && <div className="loading">Loading item images...</div>}
-          <div style={{ display: showContent ? 'block' : 'none' }}>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2rem' }}>
-              <h2 style={{ margin: 0 }}>{formatItemName(itemId)}</h2>
-              <ItemIcon 
-                itemId={itemId} 
-                size={40} 
-                style={{ marginLeft: '10px' }} 
-                onLoad={handleImageLoaded} 
-                onError={handleImageError}
-              />
-            </div>
+      <div className="content">
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2rem' }}>
+          <h2 style={{ margin: 0 }}>{formatItemName(itemId)}</h2>
+          <ItemIcon 
+            itemId={itemId} 
+            size={40} 
+            style={{ marginLeft: '10px' }} 
+            onLoad={handleImageLoaded} 
+            onError={handleImageError}
+          />
+        </div>
 
-            {/* Always use statsData for consistent stats display */}
-            {hasStatsData ? (
-              renderStats(statsData, formatItemName(itemId))
-            ) : (
-              <div className="loading">
-                <p>Loading statistics...</p>
-              </div>
-            )}
-            
-            <div className="card">
-              <div className="chart-header">
-                <h2>Market History</h2>
-                <div className="interval-selector">
-                  {availableIntervals.map(interval => (
-                    <button
-                      key={interval.value}
-                      className={`interval-button ${selectedInterval === interval.value ? 'active' : ''}`}
-                      onClick={() => handleIntervalChange(interval.value)}
-                      disabled={isRefreshing}
-                    >
-                      {interval.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              
-              {isRefreshing ? (
-                <div className="loading">
-                  <p>Updating chart data...</p>
-                </div>
-              ) : shouldShowChart ? (
-                <PriceChart priceData={chartData} selectedInterval={selectedInterval} />
-              ) : (
-                <div className="loading">
-                  <p>No price data available for the selected interval.</p>
-                </div>
-              )}
+        {/* Stats section */}
+        <div className="stats-section">
+          {loading ? (
+            <div className="loading-overlay">
+              <p>Loading statistics...</p>
+            </div>
+          ) : hasStatsData ? (
+            renderStats(statsData, formatItemName(itemId))
+          ) : priceError ? (
+            <div className="error">{priceError}</div>
+          ) : null}
+        </div>
+        
+        <div className="card">
+          <div className="chart-header">
+            <h2>Market History</h2>
+            <div className="interval-selector">
+              {availableIntervals.map(interval => (
+                <button
+                  key={interval.value}
+                  className={`interval-button ${selectedInterval === interval.value ? 'active' : ''}`}
+                  onClick={() => handleIntervalChange(interval.value)}
+                  disabled={isRefreshing}
+                >
+                  {interval.label}
+                </button>
+              ))}
             </div>
           </div>
-        </>
-      )}
+          
+          <div className="chart-container" style={{ position: 'relative', minHeight: '300px' }}>
+            {isRefreshing && (
+              <div className="loading-overlay">
+                <p>Updating chart data...</p>
+              </div>
+            )}
+            {shouldShowChart ? (
+              <PriceChart priceData={chartData} selectedInterval={selectedInterval} />
+            ) : loading ? (
+              <div className="loading-overlay">
+                <p>Loading price history...</p>
+              </div>
+            ) : (
+              <div className="no-data">
+                <p>No price data available for the selected interval.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <style jsx>{`
+        .content {
+          opacity: 1;
+          transition: opacity 0.3s ease;
+        }
+        .loading-overlay {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(0, 0, 0, 0.7);
+          border-radius: 4px;
+        }
+        .stats-section {
+          position: relative;
+          min-height: 100px;
+        }
+        .no-data {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 300px;
+          color: #666;
+        }
+      `}</style>
     </div>
   );
 };
