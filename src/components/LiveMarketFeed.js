@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import marketApi from '../api/marketApi';
 import ItemIcon from './ItemIcon';
@@ -99,87 +99,79 @@ export const renderStats = (priceData, itemName, onImageLoad) => {
 
 const LiveMarketFeed = () => {
   const navigate = useNavigate();
-  const [marketData, setMarketData] = useState([]);
-  const [displayedData, setDisplayedData] = useState([]);
+  const [marketData, setMarketData] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [visibleCount] = useState(10);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [simulatingLiveFeed, setSimulatingLiveFeed] = useState(false);
-  const [pendingItems, setPendingItems] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isChangingPage, setIsChangingPage] = useState(false);
+  const [hasMorePages, setHasMorePages] = useState(true);
+  const ITEMS_PER_PAGE = 10;
 
-  useEffect(() => {
-    const fetchMarketData = async () => {
-      try {
-        setIsRefreshing(true);
-        const response = await marketApi.getLiveMarketData();
-        
-        // Store the new data
-        setMarketData(response.body);
-        
-        if (loading) {
-          // First load - show initial 10 items immediately
-          setDisplayedData(response.body.slice(0, visibleCount));
-          setLoading(false);
-          setIsRefreshing(false);
-        } else {
-          // Find new items that aren't currently displayed
-          const currentIds = new Set(displayedData.map(item => item.id));
-          const newItems = response.body.filter(item => !currentIds.has(item.id));
-          
-          if (newItems.length > 0) {
-            // Queue up new items for the simulated live feed
-            setPendingItems(newItems);
-            setSimulatingLiveFeed(true);
-          } else {
-            // No new items, just update existing ones
-            setDisplayedData(response.body.slice(0, visibleCount));
-            setIsRefreshing(false);
-          }
-        }
-      } catch (err) {
-        setError(err.message);
-        setLoading(false);
-        setIsRefreshing(false);
-      }
-    };
-
-    // Initial fetch
-    fetchMarketData();
-
-    // Set up polling every 30 seconds
-    const interval = setInterval(fetchMarketData, 30000);
-
-    return () => clearInterval(interval);
-  }, [loading, displayedData, visibleCount]);
-
-  // Simulate live feed by adding one item at a time
-  useEffect(() => {
-    if (simulatingLiveFeed && pendingItems.length > 0) {
-      const timer = setTimeout(() => {
-        // Add the next item from the pending queue
-        const nextItem = pendingItems[0];
-        
-        setDisplayedData(prev => {
-          // Add the new item to the beginning
-          const newData = [nextItem, ...prev];
-          // Keep only up to visibleCount items
-          return newData.slice(0, visibleCount);
-        });
-        
-        // Remove the added item from pending items
-        setPendingItems(prev => prev.slice(1));
-        
-        // If no more pending items, we're done with the live feed
-        if (pendingItems.length <= 1) {
-          setSimulatingLiveFeed(false);
-          setIsRefreshing(false);
-        }
-      }, 1000 + Math.random() * 1000); // Random delay between 1-2 seconds
+  // Fetch market data for a specific page
+  const fetchMarketData = useCallback(async (pageNum) => {
+    try {
+      setIsChangingPage(true);
+      const offset = (pageNum - 1) * ITEMS_PER_PAGE;
       
-      return () => clearTimeout(timer);
+      // Check if we already loaded this page data
+      if (marketData[pageNum] && marketData[pageNum].length > 0) {
+        setIsChangingPage(false);
+        return;
+      }
+      
+      const response = await marketApi.getLiveMarketData(ITEMS_PER_PAGE, offset);
+      const newData = response.body || [];
+      
+      // Store data by page number
+      setMarketData(prevData => ({
+        ...prevData,
+        [pageNum]: newData
+      }));
+      
+      // Update hasMorePages based on if we got a full page of items
+      setHasMorePages(newData.length === ITEMS_PER_PAGE);
+      
+      setLoading(false);
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    } finally {
+      setIsChangingPage(false);
     }
-  }, [simulatingLiveFeed, pendingItems, visibleCount]);
+  }, [marketData]);
+
+  // Initial load
+  useEffect(() => {
+    fetchMarketData(1);
+  }, []);
+
+  // Handle page changes
+  useEffect(() => {
+    if (currentPage > 0) {
+      fetchMarketData(currentPage);
+    }
+  }, [currentPage, fetchMarketData]);
+
+  const handleNextPage = () => {
+    if (currentPage === totalPages && hasMorePages) {
+      // If we're on the last page and there might be more, increase total pages
+      setTotalPages(prev => prev + 1);
+    }
+    setCurrentPage(prev => prev + 1);
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(prev => prev - 1);
+    }
+  };
+
+  const goToPage = (pageNum) => {
+    if (pageNum >= 1 && pageNum <= totalPages) {
+      setCurrentPage(pageNum);
+    }
+  };
 
   const getRarityColor = (rarity) => {
     switch (rarity?.toLowerCase()) {
@@ -207,9 +199,6 @@ const LiveMarketFeed = () => {
     return `rgb(${rgbArray[0]}, ${rgbArray[1]}, ${rgbArray[2]})`;
   };
 
-  if (loading) return <div className="loading">Loading market data...</div>;
-  if (error) return <div className="error">{error}</div>;
-  
   // Modified renderPrice function with error handling
   const renderPriceWithErrorHandling = (item) => {
     const { price, quantity } = item;
@@ -251,94 +240,254 @@ const LiveMarketFeed = () => {
     );
   };
 
+  if (loading && Object.keys(marketData).length === 0) return <div className="loading">Loading market data...</div>;
+  if (error && Object.keys(marketData).length === 0) return <div className="error">{error}</div>;
+  
+  const currentItems = marketData[currentPage] || [];
+  
   return (
     <div className="market-feed">
       <h2>Live Market Listings</h2>
-      {loading && <div className="loading">Loading market data...</div>}
       
       <div className="market-grid">
-        {displayedData.map((item, index) => (
-          <div 
-            key={item.id} 
-            className={`market-item ${index === 0 && simulatingLiveFeed ? 'new-item' : ''}`}
-            onClick={() => navigate(`/${item.item_id}`)}
-            style={{ 
-              position: 'relative',
-              display: 'grid',
-              gridTemplateColumns: '50px minmax(0, 1fr) 120px auto',
-              gap: '15px',
-              alignItems: 'center',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: '0px 0px 15px rgba(0, 0, 0, 0.7)',
-            }}
-          >
+        {isChangingPage ? (
+          <div className="loading-overlay">Loading page {currentPage}...</div>
+        ) : currentItems.length === 0 ? (
+          <div className="empty-state">No items found on this page</div>
+        ) : (
+          currentItems.map((item) => (
             <div 
-              className="item-background-gradient"
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                zIndex: -1,
-                backgroundImage: `linear-gradient(to right, rgba(${getRarityColor(item.rarity).join(',')}, 0.5), rgba(${getRarityColor(item.rarity).join(',')}, 0), rgba(${getRarityColor(item.rarity).join(',')}, 0)`, 
+              key={item.id} 
+              className="market-item"
+              onClick={() => navigate(`/${item.item_id}`)}
+              style={{ 
+                position: 'relative',
+                display: 'grid',
+                gridTemplateColumns: '50px minmax(0, 1fr) 120px auto',
+                gap: '15px',
+                alignItems: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                boxShadow: '0px 0px 15px rgba(0, 0, 0, 0.7)',
               }}
-            />
-            <div className="item-image">
-              <ItemIcon 
-                itemId={item.item_id} 
-                size={30} 
+            >
+              <div 
+                className="item-background-gradient"
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  zIndex: -1,
+                  backgroundImage: `linear-gradient(to right, rgba(${getRarityColor(item.rarity).join(',')}, 0.5), rgba(${getRarityColor(item.rarity).join(',')}, 0), rgba(${getRarityColor(item.rarity).join(',')}, 0)`, 
+                }}
               />
-            </div>
-            <div className="item-name" style={{ color: getTextColor(item.rarity) }}>
-              {item.item}
-            </div>
-            <div style={{ 
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              <img 
-                src="/images/divider.png" 
-                alt="" 
-                className="price-divider" 
-              />
-              <div className="item-rarity" style={{ 
-                color: getTextColor(item.rarity),
-                textAlign: 'right',
-                flex: 1
-              }}>
-                {item.rarity}
+              <div className="item-image">
+                <ItemIcon 
+                  itemId={item.item_id} 
+                  size={30} 
+                />
               </div>
+              <div className="item-name" style={{ color: getTextColor(item.rarity) }}>
+                {item.item}
+              </div>
+              <div style={{ 
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <img 
+                  src="/images/divider.png" 
+                  alt="" 
+                  className="price-divider" 
+                />
+                <div className="item-rarity" style={{ 
+                  color: getTextColor(item.rarity),
+                  textAlign: 'right',
+                  flex: 1
+                }}>
+                  {item.rarity}
+                </div>
+              </div>
+              {renderPriceWithErrorHandling(item)}
             </div>
-            {renderPriceWithErrorHandling(item)}
-          </div>
-        ))}
+          ))
+        )}
+      </div>
+      
+      {/* Pagination controls */}
+      <div className="pagination-controls">
+        <button 
+          onClick={handlePrevPage} 
+          disabled={currentPage === 1 || isChangingPage}
+          className="pagination-button"
+        >
+          Previous
+        </button>
+        
+        <div className="pagination-info">
+          Page {currentPage} of {totalPages}
+        </div>
+        
+        {currentPage === totalPages ? (
+          <button 
+            onClick={handleNextPage} 
+            disabled={isChangingPage || !hasMorePages}
+            className="pagination-button load-more"
+          >
+            Load More
+          </button>
+        ) : (
+          <button 
+            onClick={handleNextPage} 
+            disabled={currentPage >= totalPages || isChangingPage}
+            className="pagination-button"
+          >
+            Next
+          </button>
+        )}
+      </div>
+      
+      {/* Page number buttons */}
+      <div className="pagination-numbers">
+        {[...Array(Math.min(totalPages, 5))].map((_, i) => {
+          // Show pages around current page
+          let pageNum;
+          if (totalPages <= 5) {
+            pageNum = i + 1;
+          } else if (currentPage <= 3) {
+            pageNum = i + 1;
+          } else if (currentPage >= totalPages - 2) {
+            pageNum = totalPages - 4 + i;
+          } else {
+            pageNum = currentPage - 2 + i;
+          }
+          
+          return (
+            <button
+              key={pageNum}
+              onClick={() => goToPage(pageNum)}
+              className={`page-number ${pageNum === currentPage ? 'current-page' : ''}`}
+              disabled={isChangingPage}
+            >
+              {pageNum}
+            </button>
+          );
+        })}
+        
+        {totalPages > 5 && currentPage < totalPages - 2 && (
+          <>
+            <span className="ellipsis">...</span>
+            <button
+              onClick={() => goToPage(totalPages)}
+              className={`page-number ${totalPages === currentPage ? 'current-page' : ''}`}
+              disabled={isChangingPage}
+            >
+              {totalPages}
+            </button>
+          </>
+        )}
       </div>
       
       <style jsx>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(-10px); }
-          to { opacity: 1; transform: translateY(0); }
+        .pagination-controls {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-top: 20px;
         }
-        .new-item {
-          border: 1px solid rgba(255, 255, 255, 0.2);
-          box-shadow: 0px 0px 10px rgba(255, 255, 255, 0.1);
+        
+        .pagination-button {
+          background: rgba(255, 255, 255, 0.1);
+          border: 1px solid var(--gold);
+          color: var(--gold);
+          padding: 8px 16px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        
+        .pagination-button:hover:not(:disabled) {
+          background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .pagination-button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+        
+        .pagination-info {
+          color: #ccc;
+        }
+        
+        .pagination-numbers {
+          display: flex;
+          justify-content: center;
+          gap: 10px;
+          margin-top: 15px;
+        }
+        
+        .page-number {
+          background: rgba(255, 255, 255, 0.1);
+          border: 1px solid #555;
+          color: #ccc;
+          width: 32px;
+          height: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        
+        .page-number:hover:not(:disabled) {
+          background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .page-number:disabled {
+          cursor: not-allowed;
+        }
+        
+        .current-page {
+          background: rgba(255, 215, 0, 0.2);
+          border-color: var(--gold);
+          color: var(--gold);
+        }
+        
+        .ellipsis {
+          color: #ccc;
+          align-self: center;
+        }
+        
+        .loading-overlay {
+          grid-column: 1 / -1;
+          text-align: center;
+          padding: 30px;
+          color: #ccc;
+        }
+        
+        .empty-state {
+          grid-column: 1 / -1;
+          text-align: center;
+          padding: 30px;
+          color: #ccc;
+        }
+        
+        .market-grid {
+          min-height: 400px;
+          position: relative;
+        }
+        
+        .load-more {
+          background: rgba(255, 215, 0, 0.1);
+          border-color: var(--gold);
+          font-weight: 500;
+        }
+        
+        .load-more:hover:not(:disabled) {
+          background: rgba(255, 215, 0, 0.2);
         }
       `}</style>
-      
-      {(isRefreshing || simulatingLiveFeed) && displayedData.length > 0 && (
-        <div className="refresh-indicator" style={{ 
-          textAlign: 'center', 
-          padding: '10px', 
-          fontSize: '0.8rem', 
-          color: '#888',
-          marginTop: '10px'
-        }}>
-          {simulatingLiveFeed ? 'Live feed active...' : 'Refreshing data...'}
-        </div>
-      )}
     </div>
   );
 };
