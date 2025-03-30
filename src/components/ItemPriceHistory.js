@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { getItemPriceHistory } from '../api/marketApi';
 import PriceChart from './PriceChart';
@@ -6,6 +6,7 @@ import ItemIcon from './ItemIcon';
 
 const ItemPriceHistory = () => {
   const { itemId } = useParams();
+  const [hasFetched, setHasFetched] = useState(false);
   
   const [chartData, setChartData] = useState([]);
   const [statsData, setStatsData] = useState([]);
@@ -148,95 +149,106 @@ const ItemPriceHistory = () => {
     };
   }, [loading]);
 
-  // Fetch stats data (always using 1h interval for consistency)
-  const fetchStatsData = useCallback(async () => {
-    try {
-      // Always use 1h interval for stats to ensure consistency
-      const response = await getItemPriceHistory(itemId, '1h');
-      const data = response.body || [];
-      
-      const sortedData = [...data].sort((a, b) => 
-        new Date(a.timestamp) - new Date(b.timestamp)
-      );
-      
-      setStatsData(sortedData);
-      
-      // Reset image loading state when new data arrives
-      setImagesLoaded(false);
-      setForceShowContent(false);
-      // Calculate total number of images to load (1 ItemIcon + 3 gold coins in renderPrice)
-      setImagesLoadingCount(4);
-      
-      // Set a timeout to force show content after 3 seconds even if images haven't loaded
-      setTimeout(() => {
-        setForceShowContent(true);
-      }, 3000);
-      
-      return true;
-    } catch (err) {
-      console.error(`Error fetching stats data:`, err);
-      return false;
-    }
-  }, [itemId]);
-
-  // Fetch chart data with the selected interval
-  const fetchChartData = useCallback(async () => {
+  // Fetch data with a specific interval
+  const fetchData = useCallback(async (interval) => {
     setIsRefreshing(true);
     
     try {
-      const response = await getItemPriceHistory(itemId, selectedInterval);
-      const data = response.body || [];
+      console.log(`Fetching data with interval ${interval}...`);
+      const response = await getItemPriceHistory(itemId, interval);
       
+      // Check if we got valid data back
+      if (!response || !response.body || !Array.isArray(response.body) || response.body.length === 0) {
+        console.error(`No valid data returned for ${itemId} with interval ${interval}`);
+        setIsRefreshing(false);
+        return false;
+      }
+      
+      const data = response.body;
       const sortedData = [...data].sort((a, b) => 
         new Date(a.timestamp) - new Date(b.timestamp)
       );
       
+      // If this is the '1h' interval (used for stats)
+      if (interval === '1h') {
+        setStatsData(sortedData);
+      }
+      
+      // Always update chart data with the requested interval
       setChartData(sortedData);
       setIsRefreshing(false);
       return true;
     } catch (err) {
-      console.error(`Error fetching ${selectedInterval} interval data:`, err);
-      setPriceError(`Failed to fetch price history for interval ${selectedInterval}. Please try another interval.`);
+      console.error(`Error fetching ${interval} interval data:`, err);
+      setPriceError(`Failed to fetch price history for interval ${interval}. Please try another interval.`);
       setIsRefreshing(false);
       return false;
     }
-  }, [itemId, selectedInterval]);
+  }, [itemId]);
 
-  // Initial data load
+  // Single effect to handle all data loading
   useEffect(() => {
-    if (itemId) {
+    // Skip if no itemId
+    if (!itemId) return;
+    
+    // Skip if we've already fetched for this item
+    if (hasFetched) return;
+    
+    const fetchInitialData = async () => {
       setLoading(true);
       setPriceError(null);
+      setDataLoaded(false);
       
-      const loadData = async () => {
-        // First load stats data (1h interval)
-        const statsSuccess = await fetchStatsData();
+      try {
+        console.log(`Initial data fetch for ${itemId} with interval ${selectedInterval}`);
+        // Make a single API call for the initial data
+        const success = await fetchData(selectedInterval);
         
-        // Then load chart data with selected interval
-        const chartSuccess = await fetchChartData();
-        
-        if (statsSuccess && chartSuccess) {
-          setDataLoaded(true);
-        } else if (!statsSuccess && !chartSuccess) {
-          setPriceError('Failed to fetch any data. Please check if the item name is correct.');
+        // If we need 1h data for stats and selectedInterval isn't 1h, fetch that too
+        if (success && selectedInterval !== '1h') {
+          await fetchData('1h');
         }
         
+        if (success) {
+          // Reset image loading state
+          setImagesLoaded(false);
+          setForceShowContent(false);
+          setImagesLoadingCount(4);
+          
+          // Set a timeout to force show content after 3 seconds
+          setTimeout(() => {
+            setForceShowContent(true);
+          }, 3000);
+          
+          setDataLoaded(true);
+        } else {
+          setPriceError('Failed to fetch data. Please check if the item name is correct.');
+        }
+      } catch (err) {
+        console.error(`Error during initial data load:`, err);
+        setPriceError('An error occurred while loading data.');
+      } finally {
         setLoading(false);
-      };
-      
-      loadData();
-    }
-  }, [itemId, fetchStatsData, fetchChartData]); // Include the callback functions as dependencies
+        setHasFetched(true);
+      }
+    };
+    
+    fetchInitialData();
+  }, [itemId, selectedInterval, fetchData, hasFetched]);
 
-  // When interval changes, only update chart data
+  // Reset fetch flag when itemId changes
   useEffect(() => {
-    if (itemId && dataLoaded) {
-      fetchChartData();
-    }
-  }, [selectedInterval, itemId, dataLoaded, fetchChartData]);
+    setHasFetched(false);
+  }, [itemId]);
 
   const handleIntervalChange = (interval) => {
     if (interval !== selectedInterval) {
+      // Call fetchData with the new interval directly
+      if (itemId && dataLoaded) {
+        fetchData(interval);
+      }
+      
+      // Update the state
       setSelectedInterval(interval);
     }
   };
